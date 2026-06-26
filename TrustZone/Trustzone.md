@@ -1,0 +1,675 @@
+# Arm TrustZone (TZ) - End-to-End Guide for Beginners
+
+## Table of Contents
+
+1. What is TrustZone?
+2. Why TrustZone is Needed
+3. Secure World vs Normal World
+4. Exception Levels
+5. Trusted Firmware-A (TF-A)
+6. Boot Flow (BL1 → BL2 → BL31 → Linux)
+7. Secure Monitor Call (SMC)
+8. Secure Partition (SP)
+9. Secure Partition Manager (SPM/SPMC)
+10. Secure Partition Manager Dispatcher (SPMD)
+11. FF-A (Firmware Framework for Arm A-profile)
+12. PSA (Platform Security Architecture)
+13. Complete Software Architecture
+14. Complete Runtime Flow
+15. End-to-End Example
+16. Interview Questions
+
+---
+
+# 1. What is TrustZone?
+
+TrustZone is a hardware security technology provided by Arm.
+
+It divides the entire system into two isolated environments:
+
+* Normal World
+* Secure World
+
+This ensures that sensitive data such as:
+
+* Encryption keys
+* Certificates
+* Passwords
+* Secure storage
+
+remain protected from Linux, Android, or other applications.
+
+---
+
+# 2. Why TrustZone is Needed
+
+Imagine a banking application running on Linux.
+
+If encryption keys are stored inside Linux memory:
+
+* Malware can steal them.
+* Attackers can access them.
+* Root users may dump memory.
+
+To prevent this:
+
+* Linux runs in Normal World.
+* Security services run in Secure World.
+
+This provides hardware-level isolation.
+
+---
+
+# 3. Secure World vs Normal World
+
+```text
++-----------------------------------+
+|          Normal World            |
+|-----------------------------------|
+| Applications                     |
+| Linux Kernel                     |
+| Device Drivers                   |
++-----------------------------------+
+
++-----------------------------------+
+|          Secure World            |
+|-----------------------------------|
+| Crypto Services                  |
+| Secure Storage                   |
+| Attestation Services             |
+| Key Management                   |
++-----------------------------------+
+```
+
+Normal World cannot directly access Secure World memory.
+
+---
+
+# 4. Exception Levels
+
+Arm processors support multiple privilege levels.
+
+```text
+Normal World
+
+EL0 -> User Applications
+EL1 -> Linux Kernel
+EL2 -> Hypervisor (Optional)
+
+Secure World
+
+S-EL0 -> Secure Partitions
+S-EL1 -> Trusted OS
+S-EL2 -> Secure Partition Manager
+
+EL3 -> Secure Monitor
+```
+
+## Responsibilities
+
+### EL0
+
+User applications.
+
+Example:
+
+* Banking App
+* Browser
+* Camera App
+
+### EL1
+
+Linux kernel.
+
+Handles:
+
+* Drivers
+* Scheduling
+* Memory Management
+
+### EL2
+
+Hypervisor (optional).
+
+Used for virtualization.
+
+### EL3
+
+Highest privilege level.
+
+Responsible for:
+
+* Secure Monitor
+* World Switching
+* Handling SMC Calls
+
+---
+
+# 5. Trusted Firmware-A (TF-A)
+
+TF-A is Arm's reference firmware.
+
+Main components:
+
+```text
+BL1
+BL2
+BL31
+```
+
+---
+
+# 6. Boot Flow
+
+## Step 1: Power ON
+
+Processor starts executing Boot ROM.
+
+```text
+Power ON
+   |
+   v
+BL1
+```
+
+---
+
+## BL1
+
+Responsibilities:
+
+* Initial hardware setup
+* Load BL2
+
+```text
+BL1
+ |
+ v
+BL2
+```
+
+---
+
+## BL2
+
+Responsibilities:
+
+* DDR Initialization
+* Image loading
+
+Loads:
+
+* BL31
+* Linux/U-Boot
+* Secure Partitions
+* SPMC
+
+```text
+BL2
+ |
+ +---- BL31
+ +---- Linux
+ +---- SPMC
+ +---- Secure Partitions
+```
+
+---
+
+## BL31
+
+Runs at EL3.
+
+Responsibilities:
+
+* Secure Monitor
+* SMC handling
+* World switching
+* SPMD
+
+```text
+BL31
+ |
+ +---- Secure World
+ |
+ +---- Normal World
+```
+
+---
+
+# 7. Secure Monitor Call (SMC)
+
+SMC is used when Linux wants a secure service.
+
+Example:
+
+```c
+smc #0
+```
+
+Flow:
+
+```text
+Linux
+  |
+  | SMC
+  v
+BL31
+```
+
+Processor enters EL3.
+
+---
+
+# 8. Secure Partition (SP)
+
+A Secure Partition is a secure application running in Secure World.
+
+Examples:
+
+```text
+Crypto SP
+Storage SP
+Attestation SP
+Key Management SP
+```
+
+Think of a Secure Partition as:
+
+```text
+Linux Process
+        ≈
+Secure Partition
+```
+
+Each SP is isolated from other SPs.
+
+---
+
+# 9. Secure Partition Manager (SPM/SPMC)
+
+SPMC = Secure Partition Manager Core
+
+Responsibilities:
+
+* Load Secure Partitions
+* Schedule Secure Partitions
+* Route messages
+* Manage isolation
+* Context switching
+
+Architecture:
+
+```text
+SPMC
+ |
+ +---- Crypto SP
+ |
+ +---- Storage SP
+ |
+ +---- Attestation SP
+```
+
+SPMC acts like an operating system inside the Secure World.
+
+---
+
+# 10. Secure Partition Manager Dispatcher (SPMD)
+
+SPMD lives inside BL31.
+
+Responsibilities:
+
+* Connect Normal World and Secure World
+* Forward FF-A messages
+* Coordinate world switching
+
+Architecture:
+
+```text
+Linux
+   |
+SPMD
+   |
+SPMC
+```
+
+Think:
+
+```text
+SPMD = Receptionist
+SPMC = Manager
+SP = Employee
+```
+
+---
+
+# 11. FF-A (Firmware Framework for Arm A-profile)
+
+FF-A is a communication framework.
+
+Purpose:
+
+* Standard communication
+* Message passing
+* Memory sharing
+* Partition discovery
+
+Without FF-A:
+
+```text
+Linux
+ |
+Custom Vendor SMC
+ |
+Secure Service
+```
+
+With FF-A:
+
+```text
+Linux
+ |
+FF-A Message
+ |
+Secure Service
+```
+
+FF-A standardizes communication across vendors.
+
+---
+
+# 12. PSA (Platform Security Architecture)
+
+PSA is a security architecture specification.
+
+It defines:
+
+* Secure Boot
+* Cryptography
+* Secure Storage
+* Attestation
+* Key Management
+* Isolation
+
+PSA tells us:
+
+"What security services should exist?"
+
+---
+
+## Typical PSA Services
+
+```text
+PSA Crypto
+PSA Storage
+PSA Attestation
+PSA Key Management
+```
+
+These are usually implemented as Secure Partitions.
+
+---
+
+# 13. Complete Software Architecture
+
+```text
++------------------------------------------------+
+|               Normal World                     |
++------------------------------------------------+
+| User Applications (EL0)                        |
++------------------------------------------------+
+| Linux Kernel (EL1)                             |
++------------------------------------------------+
+                    |
+                    | FF-A
+                    |
+                    v
++------------------------------------------------+
+| BL31 / SPMD (EL3)                              |
++------------------------------------------------+
+                    |
+                    v
++------------------------------------------------+
+| SPMC (S-EL2)                                   |
++------------------------------------------------+
+          |                |                |
+          v                v                v
++-------------+  +-------------+  +-------------+
+| Crypto SP   |  | Storage SP  |  | Attest SP   |
+| S-EL0       |  | S-EL0       |  | S-EL0       |
++-------------+  +-------------+  +-------------+
+```
+
+---
+
+# 14. Complete Runtime Flow
+
+When Linux needs a secure service:
+
+```text
+Application
+    |
+Linux Kernel
+    |
+FF-A Request
+    |
+SPMD (BL31)
+    |
+SPMC
+    |
+Target Secure Partition
+    |
+Result Returned
+```
+
+---
+
+# 15. End-to-End Example
+
+## Scenario
+
+A banking application wants to encrypt PIN "1234".
+
+The encryption key must remain secure.
+
+---
+
+### Step 1
+
+User enters:
+
+```text
+1234
+```
+
+Banking App runs in:
+
+```text
+EL0
+```
+
+---
+
+### Step 2
+
+Application requests encryption.
+
+```text
+encrypt(1234)
+```
+
+---
+
+### Step 3
+
+Linux receives the request.
+
+```text
+EL1
+```
+
+Linux cannot access the secure key.
+
+---
+
+### Step 4
+
+Linux sends FF-A request.
+
+```text
+Service = Crypto
+Operation = Encrypt
+Data = 1234
+```
+
+---
+
+### Step 5
+
+Request reaches SPMD.
+
+```text
+Linux
+  |
+SPMD
+```
+
+---
+
+### Step 6
+
+SPMD forwards request to SPMC.
+
+```text
+SPMD
+  |
+SPMC
+```
+
+---
+
+### Step 7
+
+SPMC identifies Crypto SP.
+
+```text
+SPMC
+  |
+Crypto SP
+```
+
+---
+
+### Step 8
+
+Crypto SP performs encryption.
+
+```text
+1234
+  |
+Encrypt
+  |
+A8F92C11
+```
+
+Key never leaves Secure World.
+
+---
+
+### Step 9
+
+Response returns.
+
+```text
+Crypto SP
+   |
+SPMC
+   |
+SPMD
+   |
+Linux
+   |
+Application
+```
+
+---
+
+### Step 10
+
+Application receives encrypted data.
+
+```text
+A8F92C11
+```
+
+---
+
+# 16. Quick Interview Summary
+
+## TrustZone
+
+Hardware isolation between Secure World and Normal World.
+
+---
+
+## BL31
+
+Runs at EL3.
+
+Responsible for:
+
+* Secure Monitor
+* SMC handling
+* World switching
+
+---
+
+## SPMD
+
+Bridge between Normal and Secure Worlds.
+
+---
+
+## SPMC
+
+Manages Secure Partitions.
+
+Responsible for:
+
+* Scheduling
+* Routing
+* Isolation
+
+---
+
+## SP
+
+Secure applications.
+
+Examples:
+
+* Crypto
+* Storage
+* Attestation
+
+---
+
+## FF-A
+
+Communication framework.
+
+Defines how messages move between worlds.
+
+---
+
+## PSA
+
+Security architecture.
+
+Defines what security services should exist.
+
+---
+
+## One-Line Interview Answer
+
+"BL31 performs Secure Monitor operations and world switching at EL3. FF-A provides standardized communication between Normal and Secure Worlds. SPMD forwards requests, SPMC manages Secure Partitions, and PSA defines secure services such as cryptography, storage, and attestation that run inside isolated Secure Partitions."
