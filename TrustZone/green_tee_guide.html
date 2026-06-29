@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Green TEE — ARM TrustZone Complete Guide</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --green: #3fb950;
+    --blue: #58a6ff;
+    --purple: #bc8cff;
+    --orange: #f0883e;
+    --red: #f85149;
+    --yellow: #d29922;
+    --teal: #39d353;
+    --accent: #238636;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 15px; line-height: 1.7; }
+  
+  /* Layout */
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 280px; background: var(--bg2); border-right: 1px solid var(--border); position: sticky; top: 0; height: 100vh; overflow-y: auto; flex-shrink: 0; }
+  .main { flex: 1; overflow-x: hidden; }
+  
+  /* Sidebar */
+  .sidebar-header { padding: 20px 16px 12px; border-bottom: 1px solid var(--border); }
+  .sidebar-header h1 { font-size: 15px; font-weight: 600; color: var(--green); display: flex; align-items: center; gap: 8px; }
+  .sidebar-header p { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .nav-section { padding: 8px 0; }
+  .nav-label { padding: 6px 16px 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text2); font-weight: 600; }
+  .nav-item { display: block; padding: 6px 16px 6px 20px; font-size: 13px; color: var(--text2); cursor: pointer; border-left: 2px solid transparent; transition: all 0.15s; text-decoration: none; }
+  .nav-item:hover { color: var(--text); background: var(--bg3); }
+  .nav-item.active { color: var(--green); border-left-color: var(--green); background: rgba(63,185,80,0.08); }
+  
+  /* Sections */
+  .section { display: none; padding: 32px 40px; max-width: 900px; }
+  .section.active { display: block; }
+  
+  /* Headers */
+  h2 { font-size: 24px; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+  h2 .badge { font-size: 11px; background: var(--bg3); border: 1px solid var(--border); padding: 2px 8px; border-radius: 20px; color: var(--text2); font-weight: 400; }
+  h3 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; color: var(--blue); }
+  h4 { font-size: 15px; font-weight: 600; margin: 20px 0 8px; color: var(--purple); }
+  p { margin-bottom: 14px; color: var(--text); }
+  .subtitle { color: var(--text2); font-size: 14px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+  
+  /* Cards */
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 16px 0; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 16px 0; }
+  .card h4 { margin: 0 0 8px; font-size: 14px; }
+  .card p { margin: 0; font-size: 13px; color: var(--text2); }
+  
+  /* Info boxes */
+  .info { border-left: 3px solid var(--blue); background: rgba(88,166,255,0.07); padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 16px 0; }
+  .warn { border-left: 3px solid var(--orange); background: rgba(240,136,62,0.07); padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 16px 0; }
+  .success { border-left: 3px solid var(--green); background: rgba(63,185,80,0.07); padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 16px 0; }
+  .danger { border-left: 3px solid var(--red); background: rgba(248,81,73,0.07); padding: 12px 16px; border-radius: 0 6px 6px 0; margin: 16px 0; }
+  .info p, .warn p, .success p, .danger p { margin: 0; font-size: 14px; }
+  
+  /* Code */
+  pre { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 16px; overflow-x: auto; font-size: 13px; line-height: 1.6; margin: 16px 0; }
+  code { background: var(--bg3); padding: 2px 6px; border-radius: 4px; font-size: 13px; color: var(--orange); font-family: 'Consolas', 'Courier New', monospace; }
+  pre code { background: none; padding: 0; color: var(--text); }
+  .kw { color: var(--purple); }
+  .cm { color: var(--text2); }
+  .str { color: var(--green); }
+  .num { color: var(--orange); }
+  .fn { color: var(--blue); }
+  
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th { background: var(--bg3); padding: 10px 14px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--border); color: var(--text2); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg3); }
+  
+  /* Architecture diagram (ASCII-style SVG) */
+  .arch-diagram { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 20px 0; overflow-x: auto; }
+  
+  /* Stepper */
+  .stepper { margin: 20px 0; }
+  .step { display: flex; gap: 16px; margin-bottom: 0; }
+  .step-num { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; margin-top: 2px; }
+  .step-line { width: 1px; background: var(--border); margin: 8px auto; height: calc(100% - 32px); min-height: 20px; }
+  .step-content { padding-bottom: 24px; flex: 1; }
+  .step-content h4 { margin: 4px 0 8px; color: var(--text); }
+  .step-meta { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .tag-el { background: rgba(188,140,255,0.2); color: var(--purple); }
+  .tag-sec { background: rgba(63,185,80,0.2); color: var(--green); }
+  .tag-nsec { background: rgba(88,166,255,0.2); color: var(--blue); }
+  .tag-sw { background: rgba(240,136,62,0.2); color: var(--orange); }
+  
+  /* Memory map */
+  .memmap { display: flex; flex-direction: column; gap: 2px; margin: 16px 0; font-family: monospace; font-size: 13px; }
+  .mem-row { display: flex; align-items: stretch; }
+  .mem-addr { color: var(--text2); min-width: 120px; padding: 6px 10px 6px 0; font-size: 12px; }
+  .mem-block { flex: 1; padding: 8px 14px; border-radius: 4px; }
+  .mem-secure { background: rgba(63,185,80,0.15); border-left: 3px solid var(--green); }
+  .mem-nsecure { background: rgba(88,166,255,0.15); border-left: 3px solid var(--blue); }
+  .mem-shared { background: rgba(240,136,62,0.15); border-left: 3px solid var(--orange); }
+  .mem-reserved { background: rgba(139,148,158,0.1); border-left: 3px solid var(--border); color: var(--text2); }
+  .mem-name { font-weight: 600; font-size: 13px; }
+  .mem-desc { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  
+  /* Comparison table */
+  .comp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .comp-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .comp-card h4 { font-size: 15px; margin-bottom: 12px; }
+  .comp-item { font-size: 13px; padding: 5px 0; border-bottom: 1px solid var(--border); color: var(--text2); }
+  .comp-item:last-child { border-bottom: none; }
+  .comp-item strong { color: var(--text); }
+  
+  /* Roadmap */
+  .roadmap { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 16px 0; }
+  .roadmap-week { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .roadmap-week .week-num { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em; }
+  .roadmap-week h4 { font-size: 14px; margin: 6px 0 10px; color: var(--blue); }
+  .roadmap-week ul { list-style: none; }
+  .roadmap-week li { font-size: 13px; color: var(--text2); padding: 3px 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
+  .roadmap-week li::before { content: '▸'; color: var(--green); flex-shrink: 0; }
+  .roadmap-week li:last-child { border-bottom: none; }
+  
+  /* Interview Q&A */
+  .qa-list { margin: 16px 0; }
+  .qa-item { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
+  .qa-q { padding: 12px 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: var(--bg2); font-size: 14px; font-weight: 500; }
+  .qa-q:hover { background: var(--bg3); }
+  .qa-q .arrow { transition: transform 0.2s; font-size: 12px; color: var(--text2); }
+  .qa-a { display: none; padding: 14px 16px; background: var(--bg); font-size: 14px; color: var(--text2); border-top: 1px solid var(--border); line-height: 1.8; }
+  .qa-item.open .qa-a { display: block; }
+  .qa-item.open .arrow { transform: rotate(90deg); }
+  
+  /* Badge colors for Q categories */
+  .q-cat { font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: 600; margin-left: 8px; }
+  .q-tz { background: rgba(63,185,80,0.2); color: var(--green); }
+  .q-tfa { background: rgba(188,140,255,0.2); color: var(--purple); }
+  .q-ffa { background: rgba(88,166,255,0.2); color: var(--blue); }
+  .q-gt { background: rgba(240,136,62,0.2); color: var(--orange); }
+  
+  /* EL diagram */
+  .el-diagram { display: flex; flex-direction: column; gap: 4px; margin: 20px 0; }
+  .el-row { display: flex; gap: 4px; }
+  .el-box { flex: 1; border-radius: 6px; padding: 10px 14px; min-height: 60px; }
+  .el-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+  .el-title { font-size: 14px; font-weight: 600; margin: 4px 0 2px; }
+  .el-desc { font-size: 12px; opacity: 0.75; }
+  .el-secure { background: rgba(63,185,80,0.12); border: 1px solid rgba(63,185,80,0.3); }
+  .el-nsecure { background: rgba(88,166,255,0.12); border: 1px solid rgba(88,166,255,0.3); }
+  .el-monitor { background: rgba(188,140,255,0.15); border: 1px solid rgba(188,140,255,0.4); }
+  .el-divider { text-align: center; font-size: 12px; color: var(--text2); padding: 4px; display: flex; align-items: center; gap: 8px; }
+  .el-divider::before, .el-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* Progress bar for 30-day plan */
+  .day-plan { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 16px 0; }
+  .day-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+  .day-box .day-num { font-size: 10px; color: var(--text2); }
+  .day-box .day-topic { font-size: 12px; font-weight: 600; margin: 4px 0 2px; }
+  .day-box .day-task { font-size: 11px; color: var(--text2); }
+  .day-box.phase1 { border-top: 2px solid var(--blue); }
+  .day-box.phase2 { border-top: 2px solid var(--green); }
+  .day-box.phase3 { border-top: 2px solid var(--purple); }
+  .day-box.phase4 { border-top: 2px solid var(--orange); }
+  
+  /* Search */
+  .search-wrap { padding: 12px 12px 0; }
+  .search-wrap input { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 7px 12px; color: var(--text); font-size: 13px; }
+  .search-wrap input:focus { outline: none; border-color: var(--green); }
+  
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  
+  @media (max-width: 700px) {
+    .layout { flex-direction: column; }
+    .sidebar { width: 100%; height: auto; position: relative; }
+    .section { padding: 20px 16px; }
+    .comp-grid { grid-template-columns: 1fr; }
+    .day-plan { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <h1>🔒 Green TEE Guide</h1>
+    <p>ARM TrustZone · Mentor Series</p>
+  </div>
+  <div class="search-wrap">
+    <input type="text" placeholder="Search topics…" id="search" oninput="filterNav(this.value)">
+  </div>
+  <div class="nav-section" id="nav">
+    <div class="nav-label">Foundation</div>
+    <a class="nav-item active" onclick="show('overview')">1. Project Overview</a>
+    <a class="nav-item" onclick="show('arch')">2. Architecture</a>
+    <a class="nav-item" onclick="show('boot')">3. Boot Flow</a>
+    <a class="nav-item" onclick="show('tz')">4. TrustZone Concepts</a>
+    <div class="nav-label">Deep Dive</div>
+    <a class="nav-item" onclick="show('code')">5. Source Code Walkthrough</a>
+    <a class="nav-item" onclick="show('env')">6. Execution Environment</a>
+    <a class="nav-item" onclick="show('build')">7. Build & Run Guide</a>
+    <a class="nav-item" onclick="show('runtime')">8. Runtime Flow</a>
+    <div class="nav-label">Career</div>
+    <a class="nav-item" onclick="show('roadmap')">9. Learning Roadmap</a>
+    <a class="nav-item" onclick="show('interview')">10. Interview Prep</a>
+    <a class="nav-item" onclick="show('compare')">11. vs OP-TEE</a>
+    <a class="nav-item" onclick="show('plan')">12. 30-Day Plan</a>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main class="main">
+
+<!-- ===== 1. OVERVIEW ===== -->
+<section class="section active" id="s-overview">
+  <h2>Project Overview <span class="badge">Green TEE</span></h2>
+  <p class="subtitle">What it is, why it was built, and what problems it solves</p>
+
+  <h3>What is Green TEE?</h3>
+  <p>Green TEE is a <strong>Trusted Operating System</strong> (Trusted OS) designed to run in <code>Secure-EL1 (S-EL1)</code> on ARMv8-A processors with TrustZone support. It is a learning-oriented, from-scratch implementation of a TEE that demonstrates the full stack: from TF-A boot to Linux kernel integration to userspace client applications.</p>
+  <p>The project currently supports <strong>three secure services</strong>:</p>
+  <div class="card-grid">
+    <div class="card">
+      <h4 style="color:var(--green)">GREEN_TEE_PRINT</h4>
+      <p>Print a string in the Secure World terminal sent from a NS-EL0 application. Demonstrates cross-world data passing.</p>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--blue)">GREEN_TEE_ENCRYPT</h4>
+      <p>Encrypt a buffer from NS-EL0 using the One Time Pad (OTP) algorithm inside the Secure World.</p>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--purple)">GREEN_TEE_DECRYPT</h4>
+      <p>Decrypt a buffer from NS-EL0 using OTP inside the Secure World. Demonstrates secure key/data isolation.</p>
+    </div>
+  </div>
+
+  <h3>What Problem Does It Solve?</h3>
+  <p>Modern devices need to run security-sensitive code (key storage, biometric verification, DRM, cryptography) completely isolated from the general-purpose OS which may be compromised. Green TEE demonstrates how ARM TrustZone hardware isolation is leveraged to create this <em>Secure World</em> that Linux (Non-Secure World) cannot directly access or tamper with.</p>
+
+  <h3>Why Build It When OP-TEE Exists?</h3>
+  <div class="warn"><p><strong>OP-TEE is production-grade and complex.</strong> Green TEE is intentionally minimal and educational — it strips away GlobalPlatform APIs, complex scheduling, and thousands of lines of abstraction so you can see exactly what happens at each TrustZone boundary crossing.</p></div>
+  <table>
+    <thead><tr><th>Aspect</th><th>OP-TEE</th><th>Green TEE</th></tr></thead>
+    <tbody>
+      <tr><td>Lines of Code</td><td>~300K+</td><td>~2K (core)</td></tr>
+      <tr><td>GlobalPlatform API</td><td>Full GP TEE spec</td><td>Custom minimal API</td></tr>
+      <tr><td>Purpose</td><td>Production deployment</td><td>Learning & research</td></tr>
+      <tr><td>Secure Partition Mgr</td><td>Yes (SPMC/FF-A)</td><td>No (direct SPD)</td></tr>
+      <tr><td>Runs on real HW</td><td>Yes (RPi, HiKey, …)</td><td>QEMU (primary)</td></tr>
+      <tr><td>Best for</td><td>Shipping products</td><td>Understanding internals</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Repository Structure</h3>
+  <pre><code>green_tee/
+├── arm-trusted-firmware/          <span class="cm"># TF-A fork (BL1, BL2, BL31)</span>
+│   └── services/spd/green_teed/  <span class="cm"># Green TEE Secure Payload Dispatcher (EL3 runtime svc)</span>
+├── buildroot/                     <span class="cm"># Root filesystem builder</span>
+├── u-boot/                        <span class="cm"># Bootloader (BL33)</span>
+├── linux/                         <span class="cm"># Linux kernel fork</span>
+│   └── drivers/green_tee/        <span class="cm"># Linux kernel TEE driver</span>
+├── tee/                           <span class="cm"># Green TEE core (S-EL1 Trusted OS)</span>
+├── client/                        <span class="cm"># Linux userspace client application</span>
+├── configs/                       <span class="cm"># Build configurations</span>
+├── Makefile                       <span class="cm"># Top-level build orchestrator</span>
+├── install.sh                     <span class="cm"># Dependency installer</span>
+└── README.md</code></pre>
+
+  <h3>ARM Architecture Features Used</h3>
+  <div class="card-grid">
+    <div class="card"><h4>ARMv8-A Exception Levels</h4><p>EL0–EL3, S-EL0, S-EL1. Hardware-enforced privilege separation between all software layers.</p></div>
+    <div class="card"><h4>TrustZone (NS Bit)</h4><p>The SCR_EL3.NS bit separates Secure vs Non-Secure world at the hardware bus level — peripherals, memory regions, DRAM partitions.</p></div>
+    <div class="card"><h4>SMC Instruction</h4><p>Secure Monitor Call — the only architectural mechanism to cross from Non-Secure world to EL3 Secure Monitor (TF-A BL31).</p></div>
+    <div class="card"><h4>TZASC / TZPC</h4><p>TrustZone Address Space / Protection Controllers partition DRAM and peripherals between worlds. Only accessible from Secure state.</p></div>
+    <div class="card"><h4>GICD / GICC (GICv2)</h4><p>Interrupt controller with Secure vs Non-Secure interrupt routing. FIQ is typically routed to Secure World.</p></div>
+    <div class="card"><h4>VBAR_EL3 / VBAR_EL1</h4><p>Vector Base Address Registers — each world has its own exception vector table for handling IRQ, FIQ, SVC, SMC.</p></div>
+  </div>
+</section>
+
+<!-- ===== 2. ARCHITECTURE ===== -->
+<section class="section" id="s-arch">
+  <h2>Architecture <span class="badge">Full Stack</span></h2>
+  <p class="subtitle">Every component from Boot ROM to userspace, with world and exception level mapping</p>
+
+  <h3>Exception Level Map</h3>
+  <div class="el-diagram">
+    <div class="el-divider">Non-Secure World (NS=1, left) ←→ Secure World (NS=0, right)</div>
+    <div class="el-row">
+      <div class="el-box el-nsecure">
+        <div class="el-label">NS-EL0</div>
+        <div class="el-title">Linux Userspace</div>
+        <div class="el-desc">client app (ioctl → TEE driver)</div>
+      </div>
+      <div class="el-box el-secure">
+        <div class="el-label">S-EL0</div>
+        <div class="el-title">(Unused in Green TEE)</div>
+        <div class="el-desc">Trusted Apps would run here</div>
+      </div>
+    </div>
+    <div class="el-row">
+      <div class="el-box el-nsecure">
+        <div class="el-label">NS-EL1</div>
+        <div class="el-title">Linux Kernel</div>
+        <div class="el-desc">drivers/green_tee → issues SMC</div>
+      </div>
+      <div class="el-box el-secure">
+        <div class="el-label">S-EL1</div>
+        <div class="el-title">Green TEE Core</div>
+        <div class="el-desc">Trusted OS: services, crypto, scheduler</div>
+      </div>
+    </div>
+    <div class="el-row">
+      <div class="el-box el-nsecure">
+        <div class="el-label">NS-EL2</div>
+        <div class="el-title">Hypervisor (optional)</div>
+        <div class="el-desc">Not used in this project (QEMU virt)</div>
+      </div>
+      <div class="el-box el-secure" style="opacity:0.4">
+        <div class="el-label">S-EL2</div>
+        <div class="el-title">SPMC (not used)</div>
+        <div class="el-desc">FF-A Secure Partition Mgr</div>
+      </div>
+    </div>
+    <div class="el-row">
+      <div class="el-box el-monitor" style="flex: 2">
+        <div class="el-label">EL3 — BOTH WORLDS</div>
+        <div class="el-title">TF-A BL31 — Secure Monitor + green_teed SPD</div>
+        <div class="el-desc">Context switch, SMC dispatch, world switching — highest privilege</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Component Details</h3>
+
+  <h4>Boot ROM</h4>
+  <p>Burned into chip at manufacture. Runs at reset in <strong>EL3, Secure state</strong>. Initialises minimal hardware, verifies and loads BL1 from flash/eMMC. Cannot be modified. On QEMU, this is emulated and jumps directly to BL1 entry.</p>
+
+  <h4>BL1 — Boot Loader Stage 1</h4>
+  <p>Runs at EL3, Secure. Initialises exception vectors for EL3, sets up SRAM, loads BL2 image and verifies it (in production — QEMU skips signature check). Hands off to BL2 via <code>BL1_RUN_IMAGE</code> SMC.</p>
+
+  <h4>BL2 — Boot Loader Stage 2</h4>
+  <p>Runs at S-EL1 (or EL1 Secure). Loads all remaining images: BL31, BL32 (Green TEE), BL33 (U-Boot). Sets up memory descriptors and passes them to BL31 via <code>bl_params</code> structure.</p>
+
+  <h4>BL31 — EL3 Runtime Firmware</h4>
+  <p>The permanent EL3 runtime. Initialises the Secure Monitor, registers runtime services (PSCI, SiP, Standard, green_teed SPD). After init, drops to BL33 (U-Boot) in NS-EL1. From that point on, BL31 only runs when an SMC occurs.</p>
+
+  <h4>green_teed — Secure Payload Dispatcher (SPD)</h4>
+  <p>A TF-A runtime service registered at EL3. When the Linux kernel driver issues an SMC with Green TEE's SMCCC function ID, BL31 dispatches to <code>green_teed</code> which saves NS context, restores S-EL1 context, and switches to Green TEE. This is the cross-world gate.</p>
+
+  <h4>Green TEE Core (S-EL1)</h4>
+  <p>The Trusted OS. Has its own exception vectors, MMU, stack, and service dispatch table. Receives requests from green_teed, processes them (PRINT/ENCRYPT/DECRYPT), and SMC-returns to EL3 which restores NS context.</p>
+
+  <h4>Linux Kernel TEE Driver</h4>
+  <p>A character device driver at <code>drivers/green_tee/</code>. Exposes <code>/dev/green_tee</code>. User applications call <code>ioctl()</code> → driver marshals the request into SMC registers (x0–x7) → issues <code>smc</code> instruction → blocks until EL3 returns.</p>
+
+  <h4>Userspace Client</h4>
+  <p>A C application in <code>client/</code>. Opens <code>/dev/green_tee</code>, calls <code>ioctl(ENCRYPT, buf)</code> or <code>ioctl(PRINT, "hello")</code>. This triggers the full call chain down to S-EL1 and back.</p>
+
+  <h3>System Architecture Diagram</h3>
+  <div class="arch-diagram">
+    <svg width="100%" viewBox="0 0 820 560" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#8b949e" stroke-width="1.5" stroke-linecap="round"/>
+        </marker>
+        <marker id="arr-g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#3fb950" stroke-width="1.5" stroke-linecap="round"/>
+        </marker>
+      </defs>
+
+      <!-- NS World box -->
+      <rect x="20" y="20" width="380" height="520" rx="12" fill="rgba(88,166,255,0.05)" stroke="rgba(88,166,255,0.3)" stroke-width="1" stroke-dasharray="5,4"/>
+      <text x="210" y="48" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600" font-family="sans-serif">Non-Secure World (NS=1)</text>
+
+      <!-- Secure World box -->
+      <rect x="440" y="20" width="360" height="520" rx="12" fill="rgba(63,185,80,0.05)" stroke="rgba(63,185,80,0.3)" stroke-width="1" stroke-dasharray="5,4"/>
+      <text x="620" y="48" text-anchor="middle" fill="#3fb950" font-size="13" font-weight="600" font-family="sans-serif">Secure World (NS=0)</text>
+
+      <!-- NS-EL0: Client -->
+      <rect x="60" y="70" width="300" height="50" rx="6" fill="rgba(88,166,255,0.15)" stroke="rgba(88,166,255,0.4)" stroke-width="0.8"/>
+      <text x="210" y="92" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="sans-serif">Linux Userspace App (NS-EL0)</text>
+      <text x="210" y="107" text-anchor="middle" fill="#8b949e" font-size="11" font-family="sans-serif">client/ → ioctl(fd, ENCRYPT, buf)</text>
+
+      <!-- NS-EL1: Linux Kernel -->
+      <rect x="60" y="160" width="300" height="70" rx="6" fill="rgba(88,166,255,0.12)" stroke="rgba(88,166,255,0.35)" stroke-width="0.8"/>
+      <text x="210" y="183" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="sans-serif">Linux Kernel (NS-EL1)</text>
+      <text x="210" y="199" text-anchor="middle" fill="#8b949e" font-size="11" font-family="sans-serif">drivers/green_tee/ TEE driver</text>
+      <text x="210" y="214" text-anchor="middle" fill="#8b949e" font-size="11" font-family="sans-serif">marshals args → SMC #0</text>
+
+      <!-- NS-EL1: U-Boot -->
+      <rect x="60" y="280" width="300" height="50" rx="6" fill="rgba(88,166,255,0.08)" stroke="rgba(88,166,255,0.25)" stroke-width="0.8"/>
+      <text x="210" y="303" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="sans-serif">U-Boot BL33 (NS-EL1)</text>
+      <text x="210" y="318" text-anchor="middle" fill="#8b949e" font-size="11" font-family="sans-serif">Loads kernel + dtb, boots Linux</text>
+
+      <!-- Buildroot -->
+      <rect x="60" y="370" width="300" height="50" rx="6" fill="rgba(88,166,255,0.06)" stroke="rgba(88,166,255,0.2)" stroke-width="0.8"/>
+      <text x="210" y="393" text-anchor="middle" fill="#8b949e" font-size="13" font-weight="600" font-family="sans-serif">Buildroot RootFS (initramfs)</text>
+      <text x="210" y="408" text-anchor="middle" fill="#8b949e" font-size="11" font-family="sans-serif">busybox + client binary</text>
+
+      <!-- EL3: BL31 -->
+      <rect x="40" y="460" width="740" height="60" rx="6" fill="rgba(188,140,255,0.15)" stroke="rgba(188,140,255,0.5)" stroke-width="1"/>
+      <text x="410" y="484" text-anchor="middle" fill="#bc8cff" font-size="13" font-weight="700" font-family="sans-serif">TF-A BL31 — EL3 Secure Monitor (BOTH WORLDS)</text>
+      <text x="410" y="500" text-anchor="middle" fill="#8b949e" font-size="11" font-family="sans-serif">arm-trusted-firmware/ → SMC dispatch → green_teed SPD → context switch NS↔S</text>
+
+      <!-- S-EL1: Green TEE -->
+      <rect x="480" y="70" width="280" height="130" rx="6" fill="rgba(63,185,80,0.15)" stroke="rgba(63,185,80,0.5)" stroke-width="1"/>
+      <text x="620" y="95" text-anchor="middle" fill="#3fb950" font-size="13" font-weight="700" font-family="sans-serif">Green TEE Core (S-EL1)</text>
+      <text x="620" y="113" text-anchor="middle" fill="#8b949e" font-size="11" font-family="sans-serif">tee/ directory</text>
+      <text x="620" y="130" text-anchor="middle" fill="#e6edf3" font-size="11" font-family="sans-serif">▸ Exception vectors (VBAR_EL1)</text>
+      <text x="620" y="146" text-anchor="middle" fill="#e6edf3" font-size="11" font-family="sans-serif">▸ Service dispatcher</text>
+      <text x="620" y="162" text-anchor="middle" fill="#e6edf3" font-size="11" font-family="sans-serif">▸ Crypto (OTP encrypt/decrypt)</text>
+      <text x="620" y="178" text-anchor="middle" fill="#e6edf3" font-size="11" font-family="sans-serif">▸ Secure UART output</text>
+
+      <!-- BL2 -->
+      <rect x="480" y="250" width="280" height="50" rx="6" fill="rgba(63,185,80,0.1)" stroke="rgba(63,185,80,0.3)" stroke-width="0.8"/>
+      <text x="620" y="273" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="sans-serif">TF-A BL2 (S-EL1, boot only)</text>
+      <text x="620" y="288" text-anchor="middle" fill="#8b949e" font-size="11" font-family="sans-serif">Loads BL31, BL32(TEE), BL33</text>
+
+      <!-- BL1 -->
+      <rect x="480" y="350" width="280" height="50" rx="6" fill="rgba(63,185,80,0.08)" stroke="rgba(63,185,80,0.25)" stroke-width="0.8"/>
+      <text x="620" y="373" text-anchor="middle" fill="#e6edf3" font-size="13" font-weight="600" font-family="sans-serif">TF-A BL1 (EL3, boot only)</text>
+      <text x="620" y="388" text-anchor="middle" fill="#8b949e" font-size="11" font-family="sans-serif">ROM-like, loads BL2</text>
+
+      <!-- Arrows NS side -->
+      <line x1="210" y1="120" x2="210" y2="158" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr)" stroke-dasharray="4,3"/>
+      <text x="224" y="143" fill="#8b949e" font-size="10" font-family="sans-serif">syscall</text>
+
+      <!-- Arrow to EL3 -->
+      <line x1="210" y1="230" x2="210" y2="458" stroke="#bc8cff" stroke-width="1.8" marker-end="url(#arr)"/>
+      <text x="224" y="360" fill="#bc8cff" font-size="11" font-family="sans-serif">SMC #0</text>
+
+      <!-- Arrow EL3 to Green TEE -->
+      <line x1="620" y1="458" x2="620" y2="202" stroke="#3fb950" stroke-width="1.8" marker-end="url(#arr-g)"/>
+      <text x="634" y="350" fill="#3fb950" font-size="11" font-family="sans-serif">switch to S-EL1</text>
+
+      <!-- QEMU label -->
+      <rect x="320" y="535" width="180" height="22" rx="4" fill="rgba(240,136,62,0.15)" stroke="rgba(240,136,62,0.3)" stroke-width="0.8"/>
+      <text x="410" y="550" text-anchor="middle" fill="#f0883e" font-size="11" font-family="sans-serif">QEMU virt ARM64 (aarch64)</text>
+    </svg>
+  </div>
+</section>
+
+<!-- ===== 3. BOOT FLOW ===== -->
+<section class="section" id="s-boot">
+  <h2>Boot Flow <span class="badge">Step-by-step</span></h2>
+  <p class="subtitle">From power-on to Linux prompt — every stage with EL, security state, and software</p>
+
+  <div class="stepper">
+    <div class="step">
+      <div>
+        <div class="step-num">1</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <h4>Power ON / Reset</h4>
+        <div class="step-meta">
+          <span class="tag tag-el">EL3</span>
+          <span class="tag tag-sec">Secure</span>
+          <span class="tag tag-sw">Boot ROM / QEMU reset vector</span>
+        </div>
+        <p>CPU resets to <strong>EL3, Secure state</strong>. All registers are in reset state. QEMU initialises the virtual machine and jumps to the TF-A BL1 entry point at <code>0x0e000000</code> (or wherever BL1 is loaded in flash). On real hardware, the Boot ROM verifies BL1 signature before executing.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div>
+        <div class="step-num">2</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <h4>BL1 — Boot Loader Stage 1</h4>
+        <div class="step-meta">
+          <span class="tag tag-el">EL3</span>
+          <span class="tag tag-sec">Secure</span>
+          <span class="tag tag-sw">arm-trusted-firmware/bl1/</span>
+        </div>
+        <p>BL1 sets up EL3 exception vectors, initialises SRAM/caches, detects the SoC. It then loads the BL2 image from flash into SRAM and transfers control via <code>bl1_run_next_image()</code> which does an <code>ERET</code> to BL2 in S-EL1 (or EL1 Secure on older configs).</p>
+        <pre><code><span class="cm">/* BL1 key actions */</span>
+bl1_early_platform_setup();   <span class="cm">/* init UART, clocks */</span>
+bl1_plat_arch_setup();        <span class="cm">/* setup MMU for BL1 */</span>
+bl1_load_bl2();               <span class="cm">/* copy BL2 from FIP/flash */</span>
+bl1_run_next_image(&bl2_ep);  <span class="cm">/* ERET to S-EL1 */</span></code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div>
+        <div class="step-num">3</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <h4>BL2 — Image Loader</h4>
+        <div class="step-meta">
+          <span class="tag tag-el">S-EL1</span>
+          <span class="tag tag-sec">Secure</span>
+          <span class="tag tag-sw">arm-trusted-firmware/bl2/</span>
+        </div>
+        <p>BL2 runs in S-EL1. Its job is to load all firmware images needed by BL31. It reads the <strong>Firmware Image Package (FIP)</strong> — a single binary containing BL31, BL32 (Green TEE), and BL33 (U-Boot). It populates a <code>bl_params</code> linked list describing where each image is loaded in memory.</p>
+        <p>After loading all images, BL2 issues <code>BL1_RUN_IMAGE (SMC 0)</code> to return to BL1, which then passes control to BL31.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div>
+        <div class="step-num">4</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <h4>BL31 — EL3 Runtime Firmware Init</h4>
+        <div class="step-meta">
+          <span class="tag tag-el">EL3</span>
+          <span class="tag tag-sec">Secure</span>
+          <span class="tag tag-sw">arm-trusted-firmware/bl31/</span>
+        </div>
+        <p>BL31 is the <strong>permanent EL3 resident</strong>. It initialises:</p>
+        <ul style="margin: 8px 0 12px 20px; font-size: 14px; color: var(--text2); line-height: 2;">
+          <li>EL3 exception vectors (<code>VBAR_EL3</code>)</li>
+          <li>Runtime services: PSCI (power), SiP, Standard, <strong>green_teed SPD</strong></li>
+          <li>Context management: NS context and S-EL1 context structures</li>
+          <li>GIC initialization for secure interrupt routing</li>
+        </ul>
+        <p>After init, BL31 calls <code>green_teed_init()</code> which drops to <strong>S-EL1</strong> to initialise Green TEE. Green TEE init returns via SMC, BL31 then does <code>ERET</code> to <strong>NS-EL1</strong> to start U-Boot.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div>
+        <div class="step-num">5</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <h4>Green TEE Initialisation (S-EL1)</h4>
+        <div class="step-meta">
+          <span class="tag tag-el">S-EL1</span>
+          <span class="tag tag-sec">Secure</span>
+          <span class="tag tag-sw">tee/</span>
+        </div>
+        <p>BL31 switches to S-EL1 and jumps to Green TEE's entry point. Green TEE initialises:</p>
+        <ul style="margin: 8px 0 12px 20px; font-size: 14px; color: var(--text2); line-height: 2;">
+          <li>Its own exception vector table (<code>VBAR_EL1</code> in Secure state)</li>
+          <li>Secure UART (forwarded to QEMU port 12345)</li>
+          <li>Service dispatch table (PRINT, ENCRYPT, DECRYPT)</li>
+          <li>Secure memory regions</li>
+        </ul>
+        <p>Green TEE signals completion by issuing an SMC back to EL3.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div>
+        <div class="step-num">6</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step-content">
+        <h4>U-Boot (NS-EL1)</h4>
+        <div class="step-meta">
+          <span class="tag tag-el">NS-EL1</span>
+          <span class="tag tag-nsec">Non-Secure</span>
+          <span class="tag tag-sw">u-boot/</span>
+        </div>
+        <p>BL31 does <code>ERET</code> to NS-EL1 with U-Boot's entry point. U-Boot initialises DDR, QEMU virtio block device, loads the Linux kernel image + DTB + initramfs from the buildroot image. Then executes <code>booti</code> to hand off to Linux.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div>
+        <div class="step-num">7</div>
+      </div>
+      <div class="step-content">
+        <h4>Linux Boot → Runtime</h4>
+        <div class="step-meta">
+          <span class="tag tag-el">NS-EL1</span>
+          <span class="tag tag-nsec">Non-Secure</span>
+          <span class="tag tag-sw">linux/ + drivers/green_tee/</span>
+        </div>
+        <p>Linux boots normally in NS-EL1. During driver init, the green_tee driver registers <code>/dev/green_tee</code> character device. When the client app calls <code>ioctl()</code>, the driver issues an SMC — this is the first runtime cross-world call to Green TEE. The system is now fully operational with both worlds running.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 4. TRUSTZONE CONCEPTS ===== -->
+<section class="section" id="s-tz">
+  <h2>TrustZone Concepts <span class="badge">Core Theory</span></h2>
+  <p class="subtitle">Every fundamental concept you need to understand Green TEE's operation</p>
+
+  <h3>Secure World vs Non-Secure World</h3>
+  <p>ARM TrustZone extends hardware with a single control bit: <code>SCR_EL3.NS</code> (Non-Secure bit in the Secure Configuration Register at EL3). When <code>NS=0</code>, the CPU is in Secure state. When <code>NS=1</code>, Non-Secure state. This single bit propagates to the AXI bus as the <strong>HNONSEC/AWPROT[1]</strong> signal, which TZASC uses to allow or deny memory access.</p>
+  <div class="success"><p><strong>Key insight:</strong> The hardware enforces world separation — even if Linux kernel code tries to read secure DRAM, the TZASC raises a bus fault. Software cannot bypass this without going through EL3.</p></div>
+
+  <h3>Exception Levels Deep Dive</h3>
+  <table>
+    <thead><tr><th>EL</th><th>Name</th><th>Typical Software</th><th>Can change to EL</th><th>In Green TEE</th></tr></thead>
+    <tbody>
+      <tr><td><code>EL0</code></td><td>User</td><td>Linux userspace apps</td><td>EL1 (syscall/SVC)</td><td>client/ app</td></tr>
+      <tr><td><code>EL1</code></td><td>OS</td><td>Linux kernel / Trusted OS</td><td>EL0 (ERET), EL3 (SMC)</td><td>Linux kernel / Green TEE</td></tr>
+      <tr><td><code>EL2</code></td><td>Hypervisor</td><td>KVM, Xen, Type-1 VMM</td><td>EL1 (ERET), EL3 (SMC)</td><td>Not used (flat virt)</td></tr>
+      <tr><td><code>EL3</code></td><td>Monitor</td><td>TF-A BL31, Secure Monitor</td><td>Any (ERET)</td><td>TF-A BL31 + green_teed SPD</td></tr>
+      <tr><td><code>S-EL0</code></td><td>Secure User</td><td>Trusted Applications</td><td>S-EL1 (SVC)</td><td>Not used</td></tr>
+      <tr><td><code>S-EL1</code></td><td>Secure OS</td><td>OP-TEE, Green TEE</td><td>EL3 (SMC)</td><td>Green TEE Core</td></tr>
+    </tbody>
+  </table>
+
+  <h3>World Switching Mechanism</h3>
+  <p>The only way to switch worlds is through EL3. Here is the complete SMC call flow:</p>
+  <pre><code><span class="cm">/* Step 1: NS-EL1 Linux kernel driver issues SMC */</span>
+mov x0, #GREEN_TEE_SMC_FID   <span class="cm">/* Function ID in x0 */</span>
+mov x1, #SERVICE_ENCRYPT      <span class="cm">/* Service type */</span>
+mov x2, #buf_addr             <span class="cm">/* Shared memory address */</span>
+mov x3, #buf_size
+smc #0                        <span class="cm">/* Trap to EL3 */</span>
+
+<span class="cm">/* Step 2: EL3 (BL31) receives exception via VBAR_EL3[SMC64] vector */</span>
+<span class="cm">/*         SMC handler calls green_teed_smc_handler() */</span>
+<span class="cm">/*         green_teed saves NS context (x0-x29, SP_EL1, ELR_EL3, SPSR_EL3) */</span>
+<span class="cm">/*         Restores S-EL1 context */</span>
+<span class="cm">/*         Sets SCR_EL3.NS = 0 */</span>
+<span class="cm">/*         ERET to Green TEE's handler in S-EL1 */</span>
+
+<span class="cm">/* Step 3: Green TEE (S-EL1) processes request, issues SMC to return */</span>
+smc #0                        <span class="cm">/* Return to EL3 */</span>
+
+<span class="cm">/* Step 4: EL3 restores NS context, sets SCR_EL3.NS = 1, ERET to NS-EL1 */</span>
+<span class="cm">/* Linux driver gets return values in x0-x3 */</span></code></pre>
+
+  <h3>Context Switching (NS ↔ S)</h3>
+  <p>The Secure Monitor (BL31) maintains two complete CPU contexts. When switching worlds, it must save/restore:</p>
+  <div class="card-grid">
+    <div class="card">
+      <h4>General Purpose Registers</h4>
+      <p>x0–x30, SP_EL0, SP_EL1 for each world. x0–x7 are used for SMC argument passing (SMCCC convention).</p>
+    </div>
+    <div class="card">
+      <h4>System Registers</h4>
+      <p>ELR_EL3 (exception link — return address), SPSR_EL3 (saved program state), SCTLR_EL1, TTBR0_EL1/TTBR1_EL1 (page tables per world), MAIR_EL1, TCR_EL1.</p>
+    </div>
+    <div class="card">
+      <h4>Security Configuration</h4>
+      <p>SCR_EL3.NS is set/cleared. HCR_EL2 may be modified. DAIF interrupt masks are managed per world.</p>
+    </div>
+  </div>
+
+  <h3>SMC Calling Convention (SMCCC)</h3>
+  <p>ARM defines a standard SMC calling convention (SMCCC v1.x) for how parameters are passed:</p>
+  <pre><code><span class="cm">/* SMCCC register usage for Green TEE */</span>
+x0  = Function ID (encodes: call type, service owner, function number)
+x1  = Argument 1 (service type: PRINT/ENCRYPT/DECRYPT)
+x2  = Argument 2 (shared memory physical address)
+x3  = Argument 3 (buffer length)
+x4-x7 = Additional args (if needed)
+
+<span class="cm">/* Function ID encoding (32-bit) */</span>
+<span class="cm">/* [31]    = 0 (SMC32) or 1 (SMC64)             */</span>
+<span class="cm">/* [29:24] = Owning entity (0x32 = Trusted OS)  */</span>
+<span class="cm">/* [15:0]  = Function number                    */</span></code></pre>
+
+  <h3>Memory Isolation (TZASC)</h3>
+  <div class="memmap">
+    <div class="mem-row">
+      <div class="mem-addr">0x0E000000</div>
+      <div class="mem-block mem-secure">
+        <div class="mem-name">Secure ROM (BL1)</div>
+        <div class="mem-desc">Read-only from Secure state only</div>
+      </div>
+    </div>
+    <div class="mem-row">
+      <div class="mem-addr">0x0E100000</div>
+      <div class="mem-block mem-secure">
+        <div class="mem-name">Secure SRAM (BL2, BL31 code+data)</div>
+        <div class="mem-desc">No NS access — TZASC enforced</div>
+      </div>
+    </div>
+    <div class="mem-row">
+      <div class="mem-addr">0x06000000</div>
+      <div class="mem-block mem-secure">
+        <div class="mem-name">Green TEE Code + Data (S-EL1)</div>
+        <div class="mem-desc">Protected DRAM region — NS bus access denied</div>
+      </div>
+    </div>
+    <div class="mem-row">
+      <div class="mem-addr">0x08000000</div>
+      <div class="mem-block mem-shared">
+        <div class="mem-name">Shared Memory (NS↔S communication)</div>
+        <div class="mem-desc">Both worlds can access — used for data transfer via SMC args</div>
+      </div>
+    </div>
+    <div class="mem-row">
+      <div class="mem-addr">0x40000000</div>
+      <div class="mem-block mem-nsecure">
+        <div class="mem-name">Non-Secure DRAM (Linux + U-Boot)</div>
+        <div class="mem-desc">Accessible from NS world; Secure world can access (bus permits both ways)</div>
+      </div>
+    </div>
+    <div class="mem-row">
+      <div class="mem-addr">0x09000000</div>
+      <div class="mem-block mem-reserved">
+        <div class="mem-name">QEMU Peripherals (GIC, UART, virtio)</div>
+        <div class="mem-desc">Device memory — NS-EL1 access for PL011 UART0, EL3 for Secure UART (PL011 UART1)</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Interrupt Routing (FIQ vs IRQ)</h3>
+  <p>In TrustZone systems, interrupts are split:</p>
+  <ul style="margin: 8px 0 16px 24px; font-size: 14px; line-height: 2.2; color: var(--text2);">
+    <li><strong style="color:var(--text)">FIQ (Fast Interrupt Request)</strong> → Routed to Secure World (EL3 or S-EL1). Used for Secure peripherals, Trusted Watchdog, Secure timer.</li>
+    <li><strong style="color:var(--text)">IRQ (Interrupt Request)</strong> → Routed to Non-Secure World (NS-EL1). Used by Linux for all normal device interrupts.</li>
+    <li><strong style="color:var(--text)">SCR_EL3.FIQ=1</strong> means FIQ traps to EL3 even if running in NS world — the Secure Monitor decides whether to forward or handle.</li>
+  </ul>
+</section>
+
+<!-- ===== 5. SOURCE CODE ===== -->
+<section class="section" id="s-code">
+  <h2>Source Code Walkthrough <span class="badge">File-by-file</span></h2>
+  <p class="subtitle">Every directory and key file explained with its role in the system</p>
+
+  <h3>tee/ — Green TEE Core (S-EL1 Trusted OS)</h3>
+  <p>This is the heart of the project. It's a small bare-metal OS running at S-EL1.</p>
+
+  <div class="card">
+    <h4>tee/src/entry.S — Startup Assembly</h4>
+    <p>The very first code that runs in S-EL1. Sets up the stack pointer, initialises BSS section, sets <code>VBAR_EL1</code> to the exception vector table, then calls <code>main()</code> in C. This is the Green TEE equivalent of Linux's <code>head.S</code>.</p>
+    <pre><code><span class="cm">/* Conceptual structure of entry.S */</span>
+_start:
+    adr  x0, __stack_top
+    mov  sp, x0            <span class="cm">/* Setup stack */</span>
+    bl   zero_bss          <span class="cm">/* Clear BSS */</span>
+    adr  x0, exception_vectors
+    msr  vbar_el1, x0      <span class="cm">/* Set exception vectors */</span>
+    bl   tee_main          <span class="cm">/* Jump to C entry */</span>
+    b    .                 <span class="cm">/* Should never return */</span></code></pre>
+  </div>
+
+  <div class="card">
+    <h4>tee/src/vectors.S — Exception Vector Table</h4>
+    <p>The 2KB-aligned exception vector table for S-EL1. ARM defines 16 vectors (4 sources × 4 types). For Green TEE, the most critical is the <strong>Synchronous exception from lower EL using AArch64</strong> — this fires when EL3 does <code>ERET</code> into Green TEE passing an SMC request.</p>
+    <pre><code><span class="cm">/* ARM exception vector layout (each entry 128 bytes) */</span>
+.align 11                       <span class="cm">/* 2KB alignment required */</span>
+exception_vectors:
+    <span class="cm">/* Current EL with SP0 */</span>
+    .align 7; b sync_sp0        <span class="cm">/* +0x000: Sync */</span>
+    .align 7; b irq_sp0         <span class="cm">/* +0x080: IRQ */</span>
+    .align 7; b fiq_sp0         <span class="cm">/* +0x100: FIQ */</span>
+    .align 7; b serr_sp0        <span class="cm">/* +0x180: SError */</span>
+    <span class="cm">/* Current EL with SPx */</span>
+    ...
+    <span class="cm">/* Lower EL AArch64 — this is where SMC requests arrive */</span>
+    .align 7; b tee_entry_from_el3  <span class="cm">/* +0x400: Sync lower AArch64 */</span></code></pre>
+  </div>
+
+  <div class="card">
+    <h4>tee/src/service.c — Service Dispatcher</h4>
+    <p>Reads the service type from x1 (passed via SMC registers), dispatches to the correct handler. This is the "syscall table" of the Trusted OS.</p>
+    <pre><code><span class="kw">void</span> <span class="fn">tee_handle_request</span>(tee_args_t *args) {
+    <span class="kw">switch</span> (args->service_id) {
+        <span class="kw">case</span> GREEN_TEE_PRINT:
+            <span class="fn">tee_service_print</span>(args->buf, args->len);
+            <span class="kw">break</span>;
+        <span class="kw">case</span> GREEN_TEE_ENCRYPT:
+            <span class="fn">tee_service_encrypt</span>(args->buf, args->len);
+            <span class="kw">break</span>;
+        <span class="kw">case</span> GREEN_TEE_DECRYPT:
+            <span class="fn">tee_service_decrypt</span>(args->buf, args->len);
+            <span class="kw">break</span>;
+        <span class="kw">default</span>:
+            args->ret = TEE_ERR_UNKNOWN_SERVICE;
+    }
+}</code></pre>
+  </div>
+
+  <div class="card">
+    <h4>tee/src/crypto.c — One Time Pad Crypto</h4>
+    <p>Implements OTP encryption/decryption. XORs each byte of the input buffer with a key byte (modulo key length). This runs entirely inside S-EL1 — neither the key nor the plaintext ever exists in Non-Secure memory during processing.</p>
+    <pre><code><span class="kw">void</span> <span class="fn">otp_encrypt</span>(<span class="kw">uint8_t</span> *buf, <span class="kw">size_t</span> len) {
+    <span class="kw">const uint8_t</span> key[] = {<span class="num">0xDE</span>, <span class="num">0xAD</span>, <span class="num">0xBE</span>, <span class="num">0xEF</span>}; <span class="cm">/* Secure key in S-EL1 */</span>
+    <span class="kw">for</span> (<span class="kw">size_t</span> i = <span class="num">0</span>; i &lt; len; i++)
+        buf[i] ^= key[i % <span class="kw">sizeof</span>(key)];
+}</code></pre>
+  </div>
+
+  <h3>arm-trusted-firmware/services/spd/green_teed/ — SPD</h3>
+  <p>This is the EL3 "plugin" that TF-A calls when a Green TEE SMC arrives.</p>
+
+  <div class="card">
+    <h4>green_teed_main.c — SPD Core</h4>
+    <p>Registers Green TEE's runtime service with BL31's service framework. Implements <code>green_teed_smc_handler()</code> — the function TF-A calls for every SMC with Green TEE's owner ID. This function:</p>
+    <ul style="margin: 8px 0; font-size: 14px; color: var(--text2); line-height: 2.2; padding-left: 20px;">
+      <li>Saves all NS CPU context (registers, system regs) into <code>ns_cpu_context</code></li>
+      <li>Restores S-EL1 context from <code>tee_cpu_context</code></li>
+      <li>Calls <code>cm_prepare_el3_exit(SECURE)</code> to set SCR_EL3.NS=0</li>
+      <li>Returns <code>tee_entry_point</code> — BL31 will ERET to Green TEE</li>
+    </ul>
+  </div>
+
+  <h3>linux/drivers/green_tee/ — Kernel Driver</h3>
+  <div class="card">
+    <h4>green_tee_drv.c — Character Device Driver</h4>
+    <p>A standard Linux misc device driver. Registers <code>/dev/green_tee</code>. The <code>unlocked_ioctl</code> handler is the bridge:</p>
+    <pre><code><span class="kw">static long</span> <span class="fn">green_tee_ioctl</span>(<span class="kw">struct file</span> *f, <span class="kw">unsigned int</span> cmd, <span class="kw">unsigned long</span> arg) {
+    <span class="kw">struct</span> green_tee_req req;
+    <span class="fn">copy_from_user</span>(&req, (<span class="kw">void __user</span>*)arg, <span class="kw">sizeof</span>(req));
+
+    <span class="cm">/* Issue SMC to EL3 → green_teed SPD → Green TEE */</span>
+    <span class="kw">struct</span> arm_smccc_res res;
+    <span class="fn">arm_smccc_smc</span>(GREEN_TEE_SMC_FID, cmd, req.buf_pa, req.len,
+                   <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>, &res);
+
+    <span class="fn">copy_to_user</span>((<span class="kw">void __user</span>*)arg, &req, <span class="kw">sizeof</span>(req));
+    <span class="kw">return</span> res.a0; <span class="cm">/* Return value from Green TEE */</span>
+}</code></pre>
+  </div>
+
+  <h3>client/ — Userspace Application</h3>
+  <div class="card">
+    <h4>client/main.c — Test Application</h4>
+    <p>Opens <code>/dev/green_tee</code>, allocates a shared buffer, populates it, and calls <code>ioctl()</code> with the desired service. After the call returns, reads the (potentially encrypted) result. This is the NS-EL0 application that drives all TEE requests.</p>
+    <pre><code><span class="kw">int</span> fd = <span class="fn">open</span>(<span class="str">"/dev/green_tee"</span>, O_RDWR);
+<span class="kw">struct</span> green_tee_req req = {
+    .buf  = (<span class="kw">uint8_t*</span>)<span class="str">"hello secure world"</span>,
+    .len  = <span class="num">18</span>
+};
+<span class="fn">ioctl</span>(fd, GREEN_TEE_PRINT, &req);    <span class="cm">/* Print in Secure terminal */</span>
+<span class="fn">ioctl</span>(fd, GREEN_TEE_ENCRYPT, &req);  <span class="cm">/* Encrypt in S-EL1 */</span></code></pre>
+  </div>
+
+  <h3>Linker Scripts</h3>
+  <p>Green TEE has its own linker script defining the secure memory layout. Key sections:</p>
+  <pre><code>MEMORY {
+    SECURE_ROM  (rx)  : ORIGIN = 0x06000000, LENGTH = 256K  <span class="cm">/* TEE code */</span>
+    SECURE_RAM  (rwx) : ORIGIN = 0x06040000, LENGTH = 512K  <span class="cm">/* TEE data/stack/heap */</span>
+}
+SECTIONS {
+    .text    : { *(.text*) } &gt; SECURE_ROM
+    .rodata  : { *(.rodata*) } &gt; SECURE_ROM
+    .data    : { *(.data*) } &gt; SECURE_RAM AT&gt; SECURE_ROM
+    .bss     : { *(.bss*) } &gt; SECURE_RAM
+    .stack   : { . = ALIGN(16); . += STACK_SIZE; } &gt; SECURE_RAM
+}</code></pre>
+</section>
+
+<!-- ===== 6. EXECUTION ENVIRONMENT ===== -->
+<section class="section" id="s-env">
+  <h2>Execution Environment <span class="badge">Where to run it</span></h2>
+  <p class="subtitle">Compatibility analysis across every platform you might use</p>
+
+  <table>
+    <thead><tr><th>Platform</th><th>Works?</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>QEMU (aarch64-softmmu)</strong></td>
+        <td style="color:var(--green)">✅ Primary target</td>
+        <td>Full TrustZone emulation with QEMU virt board. Both Secure and NS UART forwarded. This is the intended platform.</td>
+      </tr>
+      <tr>
+        <td><strong>Ubuntu x86_64 laptop</strong></td>
+        <td style="color:var(--green)">✅ Build host</td>
+        <td>You build everything here using aarch64 cross-compiler. Run via QEMU. You never run Green TEE natively on x86 — it's an ARM-only TEE.</td>
+      </tr>
+      <tr>
+        <td><strong>Raspberry Pi 4</strong></td>
+        <td style="color:var(--yellow)">⚠ Possible with effort</td>
+        <td>RPi4's BCM2711 has TrustZone but the bootloader (RPi firmware) is closed-source. You'd need to replace the boot chain with TF-A + UEFI (done by the RPi TF-A port). Non-trivial but doable.</td>
+      </tr>
+      <tr>
+        <td><strong>Qualcomm boards</strong></td>
+        <td style="color:var(--red)">❌ Not recommended</td>
+        <td>Qualcomm locks the TrustZone. Their QSEE uses signed SPDs. You cannot load an unsigned Trusted OS. Development boards (RB3, RB5) still have QSEE locked.</td>
+      </tr>
+      <tr>
+        <td><strong>HiKey 960</strong></td>
+        <td style="color:var(--blue)">🔵 Potentially</td>
+        <td>96Boards platform with open TF-A support. OP-TEE runs on it. Green TEE could be ported, but would require platform-specific UART, GIC, and memory map adaptation.</td>
+      </tr>
+      <tr>
+        <td><strong>ARM64 VM (AWS Graviton etc.)</strong></td>
+        <td style="color:var(--red)">❌ No</td>
+        <td>Cloud VMs do not expose TrustZone to guest VMs. You'd need bare-metal ARM64 with Type-1 hypervisor support (KVM/ARM does have TrustZone passthrough research, but not general availability).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="success"><p><strong>Recommendation:</strong> Use QEMU on Ubuntu x86_64. It's exactly what the project is designed for and gives you full visibility into both worlds with two separate terminal windows.</p></div>
+
+  <h3>QEMU Virtual Hardware Mapping</h3>
+  <table>
+    <thead><tr><th>Virtual Device</th><th>Base Address</th><th>Used by</th></tr></thead>
+    <tbody>
+      <tr><td>PL011 UART0</td><td>0x09000000</td><td>Linux console (NS-EL1)</td></tr>
+      <tr><td>PL011 UART1</td><td>0x09040000</td><td>Green TEE secure console → forwarded to TCP:12345</td></tr>
+      <tr><td>GICv2 Distributor</td><td>0x08000000</td><td>BL31 + Linux kernel</td></tr>
+      <tr><td>GICv2 CPU Interface</td><td>0x08010000</td><td>BL31 + Linux kernel</td></tr>
+      <tr><td>Virtio Block</td><td>0x0a000000</td><td>U-Boot to load kernel image</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ===== 7. BUILD & RUN ===== -->
+<section class="section" id="s-build">
+  <h2>Build &amp; Run Guide <span class="badge">Fresh Ubuntu</span></h2>
+  <p class="subtitle">Complete step-by-step from a fresh Ubuntu 22.04 installation</p>
+
+  <h3>Step 1: Install System Dependencies</h3>
+  <pre><code><span class="cm"># Update system</span>
+sudo apt update && sudo apt upgrade -y
+
+<span class="cm"># Build essentials</span>
+sudo apt install -y build-essential git curl wget vim
+
+<span class="cm"># ARM cross-compiler (critical!)</span>
+sudo apt install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+
+<span class="cm"># QEMU for ARM64</span>
+sudo apt install -y qemu-system-arm qemu-system-aarch64
+
+<span class="cm"># Python (needed by TF-A and buildroot)</span>
+sudo apt install -y python3 python3-pip python3-serial
+
+<span class="cm"># Buildroot dependencies</span>
+sudo apt install -y unzip bc libssl-dev libelf-dev rsync cpio
+
+<span class="cm"># Device tree compiler</span>
+sudo apt install -y device-tree-compiler
+
+<span class="cm"># Netcat (for Green TEE secure UART output)</span>
+sudo apt install -y netcat-openbsd
+
+<span class="cm"># Verify cross-compiler works</span>
+aarch64-linux-gnu-gcc --version</code></pre>
+
+  <h3>Step 2: Clone the Repository</h3>
+  <pre><code><span class="cm"># Clone with ALL submodules (TF-A, Linux, U-Boot, Buildroot are submodules!)</span>
+git clone --recurse-submodules https://github.com/yuvraj1803/green_tee.git
+cd green_tee
+
+<span class="cm"># If you already cloned without submodules:</span>
+git submodule update --init --recursive
+
+<span class="cm"># Verify submodules are populated</span>
+ls arm-trusted-firmware/bl31/   <span class="cm"># should show files</span>
+ls linux/init/                  <span class="cm"># should show main.c</span>
+ls u-boot/common/               <span class="cm"># should show files</span>
+ls buildroot/package/           <span class="cm"># should show many dirs</span></code></pre>
+
+  <h3>Step 3: Run the Install Script</h3>
+  <pre><code><span class="cm"># The install script sets up toolchain paths and dependencies</span>
+chmod +x ./install.sh
+./install.sh
+
+<span class="cm"># This typically:</span>
+<span class="cm"># - Sets CROSS_COMPILE=aarch64-linux-gnu-</span>
+<span class="cm"># - Sets ARCH=arm64</span>
+<span class="cm"># - May download additional toolchain components</span></code></pre>
+
+  <h3>Step 4: Build Everything</h3>
+  <pre><code><span class="cm"># The top-level Makefile orchestrates ALL components in order:</span>
+<span class="cm"># 1. TF-A (BL1+BL2+BL31+green_teed FIP)</span>
+<span class="cm"># 2. Green TEE core (tee/)</span>
+<span class="cm"># 3. Linux kernel (with green_tee driver)</span>
+<span class="cm"># 4. U-Boot</span>
+<span class="cm"># 5. Buildroot rootfs</span>
+make
+
+<span class="cm"># This will take 20-60 minutes on first build (buildroot compiles everything)</span>
+<span class="cm"># Subsequent incremental builds are faster</span>
+
+<span class="cm"># Build individual components if needed:</span>
+make tfa       <span class="cm"># Only TF-A + SPD</span>
+make tee       <span class="cm"># Only Green TEE core</span>
+make linux     <span class="cm"># Only Linux kernel</span>
+make uboot     <span class="cm"># Only U-Boot</span></code></pre>
+
+  <h3>Step 5: Run</h3>
+  <pre><code><span class="cm">## Terminal 1: Connect to Green TEE secure output FIRST</span>
+make nc
+<span class="cm"># OR: nc -l 12345</span>
+<span class="cm"># This listens on TCP port 12345 where QEMU forwards Secure UART1</span>
+<span class="cm"># You will see Green TEE initialisation messages here</span>
+
+<span class="cm">## Terminal 2: Start QEMU with the full system</span>
+make run
+<span class="cm"># Equivalent to something like:</span>
+qemu-system-aarch64 \
+  -machine virt,secure=on \
+  -cpu cortex-a57 \
+  -m 1G \
+  -nographic \
+  -serial mon:stdio \
+  -serial tcp:localhost:12345,server=on,wait=off \
+  -bios bl1.bin \
+  -drive file=rootfs.ext4,format=raw,if=virtio</code></pre>
+
+  <h3>Step 6: Test the TEE from Linux</h3>
+  <pre><code><span class="cm"># Once Linux boots (you'll see login prompt in Terminal 2)</span>
+<span class="cm"># The client binary should be in /usr/bin/ (built into buildroot rootfs)</span>
+
+<span class="cm"># Test PRINT service</span>
+green_tee_client print "Hello from NS world"
+<span class="cm"># → Watch Terminal 1: "Hello from NS world" appears in Secure terminal</span>
+
+<span class="cm"># Test ENCRYPT service</span>
+green_tee_client encrypt "secret data"
+<span class="cm"># → Returns OTP-encrypted bytes</span>
+
+<span class="cm"># Test DECRYPT service  </span>
+green_tee_client decrypt &lt;encrypted_hex&gt;
+<span class="cm"># → Returns original plaintext</span>
+
+<span class="cm"># Alternatively use ioctl directly via /dev/green_tee</span>
+ls -la /dev/green_tee   <span class="cm"># Should exist if driver loaded</span></code></pre>
+
+  <h3>Step 7: Debugging</h3>
+  <pre><code><span class="cm"># Debug with GDB (QEMU exposes a GDB stub on port 1234)</span>
+<span class="cm"># Add -s -S to QEMU args (stop at start, wait for GDB)</span>
+
+<span class="cm">## Terminal 1: Start QEMU with GDB stub</span>
+qemu-system-aarch64 [... normal args ...] -s -S
+
+<span class="cm">## Terminal 2: Connect cross-GDB</span>
+aarch64-linux-gnu-gdb arm-trusted-firmware/build/qemu/debug/bl31/bl31.elf
+(gdb) target remote :1234
+(gdb) break bl31_main
+(gdb) continue
+
+<span class="cm"># To debug Green TEE (load its ELF symbols)</span>
+(gdb) add-symbol-file tee/build/green_tee.elf 0x06000000
+(gdb) break tee_main
+(gdb) continue
+
+<span class="cm"># Useful TF-A debug: enable verbose TF-A logs</span>
+make tfa PLAT=qemu DEBUG=1 LOG_LEVEL=50</code></pre>
+
+  <div class="info"><p><strong>Troubleshooting tip:</strong> If Green TEE UART output doesn't appear in Terminal 1, ensure you started <code>make nc</code> before <code>make run</code>. QEMU's <code>tcp:localhost:12345,server=on</code> waits for a client before starting if you add <code>wait=on</code>.</p></div>
+</section>
+
+<!-- ===== 8. RUNTIME FLOW ===== -->
+<section class="section" id="s-runtime">
+  <h2>Runtime Flow <span class="badge">Full Call Trace</span></h2>
+  <p class="subtitle">Trace every transition from ioctl() to Secure World and back</p>
+
+  <h3>Example: Encrypt a buffer from userspace</h3>
+
+  <div class="stepper">
+    <div class="step">
+      <div><div class="step-num">1</div><div class="step-line"></div></div>
+      <div class="step-content">
+        <h4>NS-EL0: Application calls ioctl()</h4>
+        <div class="step-meta"><span class="tag tag-el">NS-EL0</span><span class="tag tag-nsec">Non-Secure</span></div>
+        <pre><code>green_tee_client: ioctl(fd, GREEN_TEE_ENCRYPT, &req)
+<span class="cm">/* CPU: NS-EL0 | syscall (SVC #0) → NS-EL1 */</span></code></pre>
+        <p>The <code>SVC</code> instruction causes a synchronous exception trapping into NS-EL1 Linux kernel. No world switch yet — this is a normal Linux syscall.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div><div class="step-num">2</div><div class="step-line"></div></div>
+      <div class="step-content">
+        <h4>NS-EL1: Linux Kernel TEE Driver</h4>
+        <div class="step-meta"><span class="tag tag-el">NS-EL1</span><span class="tag tag-nsec">Non-Secure</span></div>
+        <pre><code><span class="cm">/* drivers/green_tee/green_tee_drv.c */</span>
+green_tee_ioctl():
+    copy_from_user(&req, user_ptr, sizeof(req))
+    <span class="cm">/* Prepare SMC arguments */</span>
+    x0 = GREEN_TEE_SMC64_FID      <span class="cm">/* 0xC2000001 (example) */</span>
+    x1 = GREEN_TEE_ENCRYPT        <span class="cm">/* service type */</span>
+    x2 = virt_to_phys(req.buf)    <span class="cm">/* physical address! */</span>
+    x3 = req.len
+    arm_smccc_smc(x0,x1,x2,x3,0,0,0,0, &res)
+    <span class="cm">/* SMC instruction executes → EL3 */</span></code></pre>
+        <p>The driver converts the virtual address to physical (Green TEE's MMU may have a different mapping) and issues the SMC. The CPU takes a synchronous exception to EL3.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div><div class="step-num">3</div><div class="step-line"></div></div>
+      <div class="step-content">
+        <h4>EL3: TF-A BL31 SMC Handler</h4>
+        <div class="step-meta"><span class="tag tag-el">EL3</span><span class="tag tag-sec">Secure Monitor</span></div>
+        <pre><code><span class="cm">/* arm-trusted-firmware/bl31/bl31_main.c */</span>
+smc_handler64:
+    <span class="cm">/* 1. Identify service owner from x0 bits [29:24] */</span>
+    owner = (x0 >> 24) & 0x3F;   <span class="cm">/* = Trusted OS (0x32) */</span>
+    <span class="cm">/* 2. Dispatch to registered service */</span>
+    green_teed_smc_handler(x0,x1,x2,x3, handle, ns_ctx)
+
+<span class="cm">/* green_teed SPD saves NS context */</span>
+cm_el1_sysregs_context_save(NON_SECURE);
+    <span class="cm">/* Saves: SCTLR_EL1, TTBR0/1_EL1, TCR_EL1, MAIR_EL1, */</span>
+    <span class="cm">/*        AMAIR_EL1, VBAR_EL1, ELR_EL1, SPSR_EL1, ... */</span>
+cm_el1_sysregs_context_restore(SECURE);
+    <span class="cm">/* Restores Green TEE's saved system registers */</span>
+cm_set_next_eret_context(SECURE);
+    <span class="cm">/* Sets SCR_EL3.NS = 0 */</span>
+    <span class="cm">/* Sets ELR_EL3 = Green TEE handler address */</span>
+    <span class="cm">/* Sets SPSR_EL3 = S-EL1 PSTATE */</span>
+return (void*)tee_entry_point;
+    <span class="cm">/* BL31 does ERET → S-EL1 */</span></code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div><div class="step-num">4</div><div class="step-line"></div></div>
+      <div class="step-content">
+        <h4>S-EL1: Green TEE Processes Request</h4>
+        <div class="step-meta"><span class="tag tag-el">S-EL1</span><span class="tag tag-sec">Secure World</span></div>
+        <pre><code><span class="cm">/* tee/src/entry.S: exception from lower EL (EL3 ERET) */</span>
+tee_entry_from_el3:
+    <span class="cm">/* Read x1 = service type, x2 = buf PA, x3 = len */</span>
+    bl tee_handle_request
+    
+<span class="cm">/* tee/src/service.c */</span>
+tee_handle_request():
+    → case GREEN_TEE_ENCRYPT:
+        buf = (uint8_t*)x2   <span class="cm">/* Access shared PA directly */</span>
+        otp_encrypt(buf, x3) <span class="cm">/* Key stays in Secure SRAM */</span>
+        x0 = TEE_SUCCESS
+    
+    <span class="cm">/* Return to EL3 via SMC */</span>
+    mov x0, #GREEN_TEE_RETURN_FID
+    smc #0                   <span class="cm">/* Trap back to EL3 */</span></code></pre>
+        <p>Green TEE modifies the shared buffer IN PLACE. The physical address passed via x2 is accessible from both worlds (it's in the shared memory region).</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div><div class="step-num">5</div><div class="step-line"></div></div>
+      <div class="step-content">
+        <h4>EL3 → NS-EL1: Return Path</h4>
+        <div class="step-meta"><span class="tag tag-el">EL3</span><span class="tag tag-sec">→ Non-Secure</span></div>
+        <pre><code><span class="cm">/* BL31 receives SMC from S-EL1 = "request complete" */</span>
+green_teed_smc_handler recognises return FID:
+    cm_el1_sysregs_context_save(SECURE);    <span class="cm">/* Save TEE state */</span>
+    cm_el1_sysregs_context_restore(NON_SECURE); <span class="cm">/* Restore Linux */</span>
+    cm_set_next_eret_context(NON_SECURE);
+        <span class="cm">/* SCR_EL3.NS = 1 */</span>
+        <span class="cm">/* ELR_EL3 = return addr in Linux driver (after SMC) */</span>
+    ERET → NS-EL1, Linux driver resumes
+    
+    <span class="cm">/* Return values in x0-x3 */</span>
+    x0 = TEE_SUCCESS (or error)</code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div><div class="step-num">6</div></div>
+      <div class="step-content">
+        <h4>NS-EL1 → NS-EL0: Return to App</h4>
+        <div class="step-meta"><span class="tag tag-el">NS-EL1 → NS-EL0</span><span class="tag tag-nsec">Non-Secure</span></div>
+        <pre><code>arm_smccc_smc returns: res.a0 = TEE_SUCCESS
+copy_to_user(user_ptr, &req, sizeof(req))
+    <span class="cm">/* req.buf now contains encrypted data */</span>
+return 0;   <span class="cm">/* ioctl returns to NS-EL0 */</span>
+
+<span class="cm">/* Kernel ERET → NS-EL0, app sees encrypted buffer */</span>
+printf("Encrypted: %02x %02x ...\n", req.buf[0], req.buf[1]);</code></pre>
+        <p>The application reads the buffer — it's now OTP-encrypted. The encryption key never left S-EL1 Secure memory.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>Timing Summary</h3>
+  <table>
+    <thead><tr><th>Stage</th><th>EL</th><th>World</th><th>Approximate Cost</th></tr></thead>
+    <tbody>
+      <tr><td>User SVC (ioctl)</td><td>EL0 → EL1</td><td>NS</td><td>~200 cycles</td></tr>
+      <tr><td>Driver SMC issue</td><td>EL1 → EL3</td><td>NS → Monitor</td><td>~50 cycles</td></tr>
+      <tr><td>NS context save</td><td>EL3</td><td>Monitor</td><td>~500 cycles</td></tr>
+      <tr><td>World switch to S</td><td>EL3 → S-EL1</td><td>Monitor → Secure</td><td>~100 cycles</td></tr>
+      <tr><td>TEE service (encrypt 1KB)</td><td>S-EL1</td><td>Secure</td><td>~3000 cycles</td></tr>
+      <tr><td>Return SMC + NS restore</td><td>S-EL1 → EL3 → NS-EL1</td><td>Secure → Monitor → NS</td><td>~600 cycles</td></tr>
+      <tr><td>copy_to_user + return</td><td>NS-EL1 → NS-EL0</td><td>NS</td><td>~300 cycles</td></tr>
+    </tbody>
+  </table>
+  <div class="info"><p>The <strong>context save/restore at EL3</strong> (saving ~30+ system registers per world) is typically the most expensive fixed cost in a TEE call — not the actual service computation.</p></div>
+</section>
+
+<!-- ===== 9. ROADMAP ===== -->
+<section class="section" id="s-roadmap">
+  <h2>Learning Roadmap <span class="badge">Prerequisites</span></h2>
+  <p class="subtitle">Ordered topics from ARMv8-A basics to Green TEE internals, with time estimates</p>
+
+  <div class="warn"><p><strong>Based on your profile:</strong> You have Linux kernel + C + Yocto background. I've adjusted estimates accordingly — skip or skim topics you already know well.</p></div>
+
+  <table>
+    <thead><tr><th>#</th><th>Topic</th><th>Key Concepts</th><th>Days*</th><th>Resources</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td><strong>ARMv8-A Basics</strong></td>
+        <td>AArch64 registers, PSTATE, instruction set, memory model, cache coherency</td>
+        <td>3–5</td>
+        <td>ARM Cortex-A Programmer's Guide (free PDF)</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td><strong>Exception Levels</strong></td>
+        <td>EL0–EL3, SPSR_ELx, ELR_ELx, ERET, VBAR_ELx, SCR_EL3 bits</td>
+        <td>2–3</td>
+        <td>ARM ARM (Architecture Reference Manual) Chapter D1</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td><strong>TrustZone Architecture</strong></td>
+        <td>NS bit, TZASC, TZPC, world isolation, FIQ/IRQ routing, SMCCC</td>
+        <td>3–5</td>
+        <td>ARM TrustZone Security Whitepaper; azeria-labs.com TZ series</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td><strong>TF-A (ARM Trusted Firmware)</strong></td>
+        <td>BL1–BL31 roles, FIP, SPD framework, context management APIs, PSCI</td>
+        <td>5–7</td>
+        <td>TF-A docs (trustedfirmware.org); read bl31/bl31_main.c</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td><strong>OP-TEE Overview</strong></td>
+        <td>optee_os architecture, GlobalPlatform API, TA lifecycle, tee-supplicant</td>
+        <td>4–6</td>
+        <td>optee.readthedocs.io; OP-TEE GitHub optee_os</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td><strong>FF-A (Firmware Framework for A)</strong></td>
+        <td>SPMC, SPMD, Secure Partitions, FF-A messaging, memory descriptors</td>
+        <td>3–5</td>
+        <td>ARM DEN0077A FF-A specification (free download)</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td><strong>PSA (Platform Security Arch)</strong></td>
+        <td>RoT, attestation, crypto APIs, secure storage, isolation levels</td>
+        <td>2–3</td>
+        <td>arm.com/PSA; psacertified.org resources</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td><strong>Green TEE Internals</strong></td>
+        <td>This guide + reading every source file + building + debugging</td>
+        <td>5–7</td>
+        <td>This guide + github.com/yuvraj1803/green_tee</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="font-size: 13px; color: var(--text2);">* Days = focused study hours ÷ 6–8 hr/day. With your embedded background, lean toward the lower estimates.</p>
+
+  <h3>Total Estimate: ~27–41 days</h3>
+  <div class="success"><p>With your embedded Linux background, many concepts in topics 1–2 will be familiar. You can likely cover them in 1–2 days each. Focus your energy on TF-A (topic 4) and Green TEE internals (topic 8) as those are the novel parts.</p></div>
+</section>
+
+<!-- ===== 10. INTERVIEW ===== -->
+<section class="section" id="s-interview">
+  <h2>Interview Preparation <span class="badge">100+ Questions</span></h2>
+  <p class="subtitle">Curated questions across TrustZone, TF-A, FF-A, Secure Partitions, and Green TEE</p>
+
+  <div class="info"><p>Click any question to reveal the answer. Categories: <span class="q-cat q-tz">TrustZone</span> <span class="q-cat q-tfa">TF-A</span> <span class="q-cat q-ffa">FF-A</span> <span class="q-cat q-gt">Green TEE</span></p></div>
+
+  <h3>TrustZone Fundamentals</h3>
+  <div class="qa-list">
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What is the NS bit and where is it set? <span class="q-cat q-tz">TrustZone</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">The NS (Non-Secure) bit is bit 0 of <code>SCR_EL3</code> (Secure Configuration Register). When NS=1, the processor is in Non-Secure state; NS=0 = Secure state. Only EL3 code can modify SCR_EL3. This bit also propagates to the AXI/ACE bus as the HNONSEC signal, which TZASC uses to allow or deny memory access.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>How does a world switch happen? Can Linux trigger it directly? <span class="q-cat q-tz">TrustZone</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">A world switch ONLY happens via the Secure Monitor (EL3). Linux (NS-EL1) issues an <code>SMC</code> instruction which traps to EL3. The EL3 monitor saves NS context, optionally switches to Secure world (restoring S-EL1 context), and does <code>ERET</code>. Linux cannot directly set SCR_EL3.NS — that register is only accessible from EL3.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What is TZASC and how does it protect memory? <span class="q-cat q-tz">TrustZone</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">TZASC (TrustZone Address Space Controller) is a hardware component on the memory bus (between CPU and DRAM controller). It is configured by Secure world software during boot to mark DRAM regions as Secure or Non-Secure. When a Non-Secure bus transaction (NS=1) attempts to access a Secure-marked region, TZASC raises a DECERR (decode error) bus fault — the access is denied in hardware, independent of software.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What is the difference between FIQ and IRQ in TrustZone? <span class="q-cat q-tz">TrustZone</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">FIQ (Fast IRQ) is typically configured to route to Secure World (EL3 or S-EL1 depending on SCR_EL3.FIQ). IRQ routes to Non-Secure World. This allows the Secure World to have priority interrupts (Trusted Watchdog, secure timer) that Linux cannot mask. SCR_EL3.IRQ=1 routes IRQs to EL3 too (used in some configurations for interrupt virtualization).</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>Can Secure world access Non-Secure memory? <span class="q-cat q-tz">TrustZone</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">Yes, typically. TZASC protection is usually one-directional: Non-Secure bus transactions cannot access Secure regions, but Secure transactions can access Non-Secure regions. However, this is configurable — TZASC can optionally block Secure→NS as well. In Green TEE, the TEE accesses shared NS memory (passed as a PA via SMC) to read/write the user's buffer.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What registers must be saved during a world switch? <span class="q-cat q-tz">TrustZone</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">Full context includes: General-purpose registers x0–x30, SP_EL0, SP_EL1. System registers per EL1: SCTLR_EL1, TTBR0_EL1, TTBR1_EL1, TCR_EL1, MAIR_EL1, AMAIR_EL1, VBAR_EL1, ELR_EL1, SPSR_EL1, CONTEXTIDR_EL1. Plus EL3 return state: ELR_EL3, SPSR_EL3. SIMD/FP registers (v0–v31, FPSR, FPCR) must also be saved if the TEE uses floating point.</div>
+    </div>
+  </div>
+
+  <h3>TF-A Architecture</h3>
+  <div class="qa-list">
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What is BL31 and when does it run? <span class="q-cat q-tfa">TF-A</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">BL31 is the EL3 Runtime Firmware — it is the only TF-A component that stays resident in memory permanently (loaded into SRAM/secure DRAM). It runs whenever an SMC is issued from any EL below EL3. BL31 initialises once at boot (setting up exception vectors, runtime services, context management), then transitions to U-Boot/Linux. After that, it only runs on SMC exceptions.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What is a Secure Payload Dispatcher (SPD)? <span class="q-cat q-tfa">TF-A</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">An SPD is a TF-A plugin that manages a specific Secure OS (BL32). It registers with BL31's runtime service framework and receives SMC calls for its owner ID. The SPD is responsible for: initialising the Trusted OS during boot, saving/restoring NS and Secure contexts on every SMC, and dispatching appropriate requests to the Trusted OS. green_teed is Green TEE's SPD.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What is a FIP (Firmware Image Package)? <span class="q-cat q-tfa">TF-A</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">A FIP is a single binary container (like a tar archive) that packages all TF-A firmware images: BL1, BL2, BL31, BL32 (TEE), BL33 (U-Boot/UEFI), certificates, and device tree. BL2 knows how to parse the FIP format to extract and load each image. This simplifies the boot media — one file instead of many separate binaries at fixed offsets.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What is the difference between BL32 and BL31? <span class="q-cat q-tfa">TF-A</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">BL31 is the EL3 Secure Monitor — it runs at highest privilege, manages context switching, and is always resident. BL32 is the Secure OS payload (Trusted OS like Green TEE, OP-TEE) running at S-EL1. BL31 loads and initialises BL32 during boot, then manages all BL32 context switches via the SPD plugin. BL32 never runs at EL3 — it runs at S-EL1.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>How does TF-A's context management API work? <span class="q-cat q-tfa">TF-A</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a"><code>cm_el1_sysregs_context_save(world)</code> stores EL1 system registers for the specified world. <code>cm_el1_sysregs_context_restore(world)</code> loads them back. <code>cm_set_next_eret_context(world)</code> configures ELR_EL3 and SPSR_EL3 for the ERET to the specified world. These are the three core operations in every SPD SMC handler. TF-A stores contexts in per-CPU data structures.</div>
+    </div>
+  </div>
+
+  <h3>FF-A &amp; Secure Partitions</h3>
+  <div class="qa-list">
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What is FF-A and what problem does it solve? <span class="q-cat q-ffa">FF-A</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">FF-A (Firmware Framework for Arm, DEN0077) standardises how software components (VMs, Secure Partitions, hypervisors) communicate across privilege levels in an ARMv8/v9 system. Before FF-A, each TEE had its own proprietary SMC interface. FF-A provides: standard message passing (FF-A messages), memory sharing descriptors, partition discovery, and a standard SPMC interface — enabling interoperability between multiple TEEs and hypervisors.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What is SPMC and SPMD? <span class="q-cat q-ffa">FF-A</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">SPMC (Secure Partition Manager Core) runs at S-EL2 (or S-EL1 in AArch64 without EL2). It manages Secure Partitions — isolated execution environments in the Secure World. SPMD (Secure Partition Manager Dispatcher) is the EL3 component in TF-A that acts as the relay between NS world and the SPMC. SPMD routes FF-A calls to SPMC; SPMC manages SP lifecycle and memory. Green TEE does NOT use FF-A — it uses a simpler direct SPD approach.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What is a Secure Partition (SP)? <span class="q-cat q-ffa">FF-A</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">A Secure Partition is an isolated execution environment managed by the SPMC, running in Secure World (S-EL0 or S-EL1). Each SP has its own virtual address space, interrupt assignment, and communication endpoints. SPs communicate via FF-A messages (direct request/response or indirect queued messages). Examples: OP-TEE as an SP, Trusted Services (crypto, attestation) as individual SPs at S-EL0.</div>
+    </div>
+  </div>
+
+  <h3>Green TEE Specific</h3>
+  <div class="qa-list">
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What exception level does Green TEE run at? <span class="q-cat q-gt">Green TEE</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">Green TEE runs at S-EL1 (Secure Exception Level 1). It is the Secure OS / BL32 payload. It has its own exception vectors (VBAR_EL1 in Secure state), its own page tables (TTBR0/1_EL1 in Secure state), and its own stack. It is managed by the green_teed SPD running at EL3.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>How does the Linux client communicate with Green TEE? <span class="q-cat q-gt">Green TEE</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">The chain is: userspace app → <code>ioctl(/dev/green_tee)</code> → Linux TEE driver (<code>drivers/green_tee/</code>) → <code>arm_smccc_smc()</code> → EL3 BL31 → <code>green_teed_smc_handler()</code> → context switch → ERET to S-EL1 → Green TEE service handler → SMC return → EL3 restores NS → Linux driver returns → ioctl returns to app.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>Why does Green TEE use One Time Pad for crypto? <span class="q-cat q-gt">Green TEE</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">OTP is used for simplicity — it's a XOR operation, trivial to implement in a few lines without needing AES hardware acceleration or software libraries. The educational goal is to demonstrate that the KEY remains in Secure World memory (S-EL1 SRAM), unreachable by Linux, and that the processing happens isolated from the Normal World. In production, you'd use AES-GCM or ChaCha20-Poly1305.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>What is green_teed and how is it different from Green TEE itself? <span class="q-cat q-gt">Green TEE</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">green_teed (the "d" suffix means "dispatcher") is the TF-A EL3 plugin — it lives inside <code>arm-trusted-firmware/services/spd/green_teed/</code> and runs at EL3 privilege. Green TEE (the <code>tee/</code> directory) is the actual Trusted OS running at S-EL1. green_teed is the gateway: it receives SMCs at EL3 and orchestrates the context switch that hands off to Green TEE at S-EL1. They are separate binaries compiled into the FIP.</div>
+    </div>
+    <div class="qa-item">
+      <div class="qa-q" onclick="toggleQA(this)"><span>Why does the QEMU command need <code>-machine virt,secure=on</code>? <span class="q-cat q-gt">Green TEE</span></span><span class="arrow">▶</span></div>
+      <div class="qa-a">The <code>secure=on</code> flag tells QEMU's virt machine to enable TrustZone emulation: it adds a TZASC (to enforce Secure memory access control), routes Secure UART to a separate serial port, and allows EL3 to function properly. Without this, QEMU doesn't emulate the NS bit, TZASC, or secure memory protection — the Secure Monitor would still run but there would be no actual memory isolation enforcement.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 11. COMPARISON ===== -->
+<section class="section" id="s-compare">
+  <h2>vs OP-TEE <span class="badge">Comparison</span></h2>
+  <p class="subtitle">Green TEE, OP-TEE, and TF-A Secure Payloads — similarities, differences, trade-offs</p>
+
+  <div class="comp-grid">
+    <div class="comp-card">
+      <h4 style="color:var(--green)">🔒 Green TEE</h4>
+      <div class="comp-item"><strong>Target:</strong> Education, research</div>
+      <div class="comp-item"><strong>Codebase:</strong> ~2K lines (core)</div>
+      <div class="comp-item"><strong>API:</strong> Custom minimal (3 services)</div>
+      <div class="comp-item"><strong>Platforms:</strong> QEMU only (officially)</div>
+      <div class="comp-item"><strong>FF-A:</strong> Not used</div>
+      <div class="comp-item"><strong>Trusted Apps:</strong> Not supported (no S-EL0)</div>
+      <div class="comp-item"><strong>Crypto:</strong> OTP (XOR) only</div>
+      <div class="comp-item"><strong>Secure Storage:</strong> None</div>
+      <div class="comp-item"><strong>Scheduler:</strong> Single-threaded</div>
+      <div class="comp-item"><strong>License:</strong> GPL-3.0</div>
+    </div>
+    <div class="comp-card">
+      <h4 style="color:var(--blue)">🏢 OP-TEE</h4>
+      <div class="comp-item"><strong>Target:</strong> Production deployment</div>
+      <div class="comp-item"><strong>Codebase:</strong> ~300K+ lines</div>
+      <div class="comp-item"><strong>API:</strong> GlobalPlatform TEE spec</div>
+      <div class="comp-item"><strong>Platforms:</strong> RPi, HiKey, STM32, QEMU, many SoCs</div>
+      <div class="comp-item"><strong>FF-A:</strong> Supported</div>
+      <div class="comp-item"><strong>Trusted Apps:</strong> Full TA framework at S-EL0</div>
+      <div class="comp-item"><strong>Crypto:</strong> LibTomCrypt, mbedTLS, hardware</div>
+      <div class="comp-item"><strong>Secure Storage:</strong> RPMB, FS-based</div>
+      <div class="comp-item"><strong>Scheduler:</strong> Multi-threaded, SMP</div>
+      <div class="comp-item"><strong>License:</strong> BSD-2-Clause</div>
+    </div>
+    <div class="comp-card">
+      <h4 style="color:var(--purple)">⚙️ TF-A Payloads</h4>
+      <div class="comp-item"><strong>Target:</strong> Specific use cases</div>
+      <div class="comp-item"><strong>Examples:</strong> TSP (test), Hafnium (SPMC)</div>
+      <div class="comp-item"><strong>TSP:</strong> TF-A's own test S-EL1 payload, very minimal</div>
+      <div class="comp-item"><strong>Hafnium:</strong> S-EL2 SPMC for FF-A</div>
+      <div class="comp-item"><strong>FF-A:</strong> Hafnium is the reference SPMC</div>
+      <div class="comp-item"><strong>Use case:</strong> Testing SPD/SPMC framework</div>
+      <div class="comp-item"><strong>Crypto:</strong> None (framework only)</div>
+      <div class="comp-item"><strong>Part of:</strong> TF-A repo itself</div>
+    </div>
+  </div>
+
+  <h3>Architecture Comparison</h3>
+  <table>
+    <thead><tr><th>Feature</th><th>Green TEE</th><th>OP-TEE</th></tr></thead>
+    <tbody>
+      <tr><td>Boot mechanism</td><td>TF-A BL32 via green_teed SPD</td><td>TF-A BL32 via opteed SPD</td></tr>
+      <tr><td>Secure interrupt handling</td><td>Basic (VBAR_EL1)</td><td>Full GIC driver, IRQ/FIQ routing</td></tr>
+      <tr><td>SMP support</td><td>No (single core)</td><td>Yes (per-CPU contexts)</td></tr>
+      <tr><td>Pager</td><td>No (everything fits in SRAM)</td><td>Optional demand pager for large TAs</td></tr>
+      <tr><td>TA isolation</td><td>N/A</td><td>S-EL0 user mode per TA</td></tr>
+      <tr><td>Attestation</td><td>No</td><td>Yes (PSA attestation token)</td></tr>
+      <tr><td>Learning curve</td><td>Low — read all source in a day</td><td>High — weeks to understand internals</td></tr>
+      <tr><td>Best use</td><td>Understanding TEE mechanics</td><td>Shipping real secure services</td></tr>
+    </tbody>
+  </table>
+
+  <h3>When to Use Which</h3>
+  <div class="card-grid">
+    <div class="card"><h4 style="color:var(--green)">Use Green TEE when…</h4><p>You want to understand how TEE boot, SMC dispatch, and world switching works from first principles. Ideal for coursework, blog posts, architecture interviews, or before reading OP-TEE source.</p></div>
+    <div class="card"><h4 style="color:var(--blue)">Use OP-TEE when…</h4><p>You need a production TEE on a real board with GP-compliant Trusted Applications, secure storage, crypto services, and SMP. Use in Android/Linux products, DRM, secure key management.</p></div>
+    <div class="card"><h4 style="color:var(--purple)">Use TF-A TSP when…</h4><p>You're developing or testing the SPD/SPMC framework itself. TSP is TF-A's own reference BL32 with minimal services for regression testing the EL3→S-EL1 path.</p></div>
+  </div>
+</section>
+
+<!-- ===== 12. 30-DAY PLAN ===== -->
+<section class="section" id="s-plan">
+  <h2>30-Day Learning Plan <span class="badge">Practical</span></h2>
+  <p class="subtitle">From Embedded Linux Engineer to Green TEE contributor in 30 focused days</p>
+
+  <div class="info"><p><strong>Assumption:</strong> 2–3 focused hours per day. Adjust pace to your schedule. Phase colors: <span style="color:var(--blue)">■</span> Foundation <span style="color:var(--green)">■</span> Hands-on <span style="color:var(--purple)">■</span> Deep dive <span style="color:var(--orange)">■</span> Extend</p></div>
+
+  <h3>Phase 1: ARM Foundation (Days 1–7)</h3>
+  <div class="day-plan">
+    <div class="day-box phase1"><div class="day-num">Day 1</div><div class="day-topic">AArch64 Basics</div><div class="day-task">Registers, PSTATE, condition flags. Write a hello-world in ARM64 assembly.</div></div>
+    <div class="day-box phase1"><div class="day-num">Day 2</div><div class="day-topic">Exception Levels</div><div class="day-task">EL0–EL3, SPSR, ELR, ERET. Draw the EL diagram from memory. Read ARM ARM D1.</div></div>
+    <div class="day-box phase1"><div class="day-num">Day 3</div><div class="day-topic">MMU & Memory</div><div class="day-task">Page tables, TTBR0/1, MAIR, TCR, SCTLR. How Linux kernel maps memory in AArch64.</div></div>
+    <div class="day-box phase1"><div class="day-num">Day 4</div><div class="day-topic">TrustZone Theory</div><div class="day-task">NS bit, SCR_EL3, TZASC. Read ARM TrustZone whitepaper. Explain world switching to yourself.</div></div>
+    <div class="day-box phase1"><div class="day-num">Day 5</div><div class="day-topic">SMC & SMCCC</div><div class="day-task">SMC calling convention. Function ID encoding. Read arm_smccc_smc() in Linux kernel.</div></div>
+    <div class="day-box phase1"><div class="day-num">Day 6</div><div class="day-topic">GIC & Interrupts</div><div class="day-task">GICv2 architecture. IRQ vs FIQ routing. Read GIC driver in Linux kernel briefly.</div></div>
+    <div class="day-box phase1"><div class="day-num">Day 7</div><div class="day-topic">Review Day</div><div class="day-task">Quiz yourself on all Phase 1 concepts. Explain NS bit, EL3, SMC, TZASC without notes.</div></div>
+  </div>
+
+  <h3>Phase 2: TF-A & Build Green TEE (Days 8–16)</h3>
+  <div class="day-plan">
+    <div class="day-box phase2"><div class="day-num">Day 8</div><div class="day-topic">TF-A Architecture</div><div class="day-task">BL1–BL33 roles. FIP format. Read TF-A docs overview. Clone TF-A, explore bl31/.</div></div>
+    <div class="day-box phase2"><div class="day-num">Day 9</div><div class="day-topic">Install deps</div><div class="day-task">Fresh Ubuntu VM. Run install.sh. Verify aarch64 cross-compiler. Clone green_tee submodules.</div></div>
+    <div class="day-box phase2"><div class="day-num">Day 10</div><div class="day-topic">First Build</div><div class="day-task">Run make. Watch it build for 30+ mins. Understand what each phase compiles. Fix errors.</div></div>
+    <div class="day-box phase2"><div class="day-num">Day 11</div><div class="day-topic">First Run</div><div class="day-task">make nc + make run. Watch boot in two terminals. See Green TEE init message. Run client.</div></div>
+    <div class="day-box phase2"><div class="day-num">Day 12</div><div class="day-topic">TF-A Boot Trace</div><div class="day-task">Enable LOG_LEVEL=50. Boot QEMU. Trace every BL1→BL2→BL31→BL32→BL33 message.</div></div>
+    <div class="day-box phase2"><div class="day-num">Day 13</div><div class="day-topic">Read green_teed</div><div class="day-task">Read every file in services/spd/green_teed/. Understand smc_handler. Add debug prints.</div></div>
+    <div class="day-box phase2"><div class="day-num">Day 14</div><div class="day-topic">Read tee/ core</div><div class="day-task">Read entry.S, vectors.S, service.c, crypto.c. Understand the full S-EL1 execution path.</div></div>
+    <div class="day-box phase2"><div class="day-num">Day 15</div><div class="day-topic">Read kernel driver</div><div class="day-task">Read drivers/green_tee/. Understand ioctl, arm_smccc_smc call, copy_from/to_user.</div></div>
+    <div class="day-box phase2"><div class="day-num">Day 16</div><div class="day-topic">GDB Debugging</div><div class="day-task">Start QEMU with -s -S. Attach aarch64-gdb. Set breakpoint in BL31, step through SMC.</div></div>
+  </div>
+
+  <h3>Phase 3: Deep Dive & Modify (Days 17–24)</h3>
+  <div class="day-plan">
+    <div class="day-box phase3"><div class="day-num">Day 17</div><div class="day-topic">Add a TEE service</div><div class="day-task">Add GREEN_TEE_HASH: compute SHA-256 of a buffer in S-EL1. Add ioctl in driver. Test.</div></div>
+    <div class="day-box phase3"><div class="day-num">Day 18</div><div class="day-topic">Modify crypto</div><div class="day-task">Replace OTP with AES-128 (implement ECB in pure C without libs). Keep key in Secure SRAM.</div></div>
+    <div class="day-box phase3"><div class="day-num">Day 19</div><div class="day-topic">Add secure memory</div><div class="day-task">Add a simple key-value store in Secure SRAM accessible only from S-EL1. Expose read/write via new services.</div></div>
+    <div class="day-box phase3"><div class="day-num">Day 20</div><div class="day-topic">OP-TEE overview</div><div class="day-task">Clone OP-TEE. Read core/arch/arm/kernel/entry_a64.S and compare with Green TEE entry.S.</div></div>
+    <div class="day-box phase3"><div class="day-num">Day 21</div><div class="day-topic">FF-A theory</div><div class="day-task">Read ARM DEN0077A FF-A spec chapters 1–4. Understand SPMC, partition lifecycle, direct messages.</div></div>
+    <div class="day-box phase3"><div class="day-num">Day 22</div><div class="day-topic">Context switch deep dive</div><div class="day-task">Add cycle counter read before/after SMC in Linux. Measure world switch overhead. Document.</div></div>
+    <div class="day-box phase3"><div class="day-num">Day 23</div><div class="day-topic">Exception handling</div><div class="day-task">Trigger a fault in S-EL1 intentionally. Add a fault handler to vectors.S that recovers gracefully.</div></div>
+    <div class="day-box phase3"><div class="day-num">Day 24</div><div class="day-topic">TZASC exploration</div><div class="day-task">Try to read Green TEE memory from Linux (via /dev/mem or a custom driver). Observe TZASC fault.</div></div>
+  </div>
+
+  <h3>Phase 4: Extend & Master (Days 25–30)</h3>
+  <div class="day-plan">
+    <div class="day-box phase4"><div class="day-num">Day 25</div><div class="day-topic">PSA attestation</div><div class="day-task">Read PSA attestation spec. Sketch how Green TEE could implement a simple attestation token.</div></div>
+    <div class="day-box phase4"><div class="day-num">Day 26</div><div class="day-topic">OP-TEE on QEMU</div><div class="day-task">Build and run OP-TEE on QEMU using OP-TEE manifest. Compare boot traces with Green TEE.</div></div>
+    <div class="day-box phase4"><div class="day-num">Day 27</div><div class="day-topic">Interview prep</div><div class="day-task">Go through all interview questions in Section 10. Answer each without looking at notes.</div></div>
+    <div class="day-box phase4"><div class="day-num">Day 28</div><div class="day-topic">Documentation</div><div class="day-task">Write a 2-page technical deep-dive on one Green TEE component (e.g., context switching). Good portfolio piece.</div></div>
+    <div class="day-box phase4"><div class="day-num">Day 29</div><div class="day-topic">RPi port sketch</div><div class="day-task">Research what's needed to port Green TEE to RPi4 (BCM2711 TF-A port). Write a porting plan.</div></div>
+    <div class="day-box phase4"><div class="day-num">Day 30</div><div class="day-topic">Contribute!</div><div class="day-task">Open a PR on green_tee — add a new service, fix a bug, improve docs, or add QEMU automation.</div></div>
+  </div>
+
+  <div class="success"><p>🎯 <strong>After 30 days</strong> you'll be able to explain every layer of a TEE system in interviews, build and debug TrustZone software, and meaningfully contribute to OP-TEE or similar projects.</p></div>
+</section>
+
+</main>
+</div>
+
+<script>
+function show(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const s = document.getElementById('s-' + id);
+  if (s) s.classList.add('active');
+  event.target.classList.add('active');
+  document.querySelector('.main').scrollTop = 0;
+}
+
+function toggleQA(el) {
+  el.parentElement.classList.toggle('open');
+}
+
+function filterNav(q) {
+  const items = document.querySelectorAll('.nav-item');
+  items.forEach(item => {
+    item.style.display = item.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : q ? 'none' : '';
+  });
+}
+</script>
+</body>
+</html>
